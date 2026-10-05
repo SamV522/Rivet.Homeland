@@ -59,7 +59,7 @@ internal sealed class SteamInvites : IDisposable
     {
         CanInvite=false;
         _connect="";
-        if(SteamAPI.IsSteamRunning())SteamFriends.ClearRichPresence();
+        SteamFriends.ClearRichPresence();
     }
 
     public void OpenInviteDialog()
@@ -96,7 +96,7 @@ internal sealed class SteamInvites : IDisposable
     public void Dispose()
     {
         _join.Dispose();
-        if(SteamAPI.IsSteamRunning())SteamFriends.ClearRichPresence();
+        SteamFriends.ClearRichPresence();
         Current=null;
     }
 }
