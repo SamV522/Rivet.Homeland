@@ -52,7 +52,7 @@ internal sealed class HomelandGame:IGameLoop,IDisposable
     {
         if(!_options.IsHost||_started)return;
         _sim=new HomelandSimulation(_settings);
-        _civilianAgents=new CivilianAgentSystem(_world,_scene,_sim.Civilians);
+        _civilianAgents=new CivilianAgentSystem(_world,_scene,_sim);
         _civilianAgents.SpawnAll();
         _sim.StartRoster(_network.PeerIds,_options.Dedicated);
         _playerActors=new PlayerActorSystem(_world,_scene,_sim,_civilianAgents);
@@ -186,6 +186,7 @@ internal sealed class HomelandGame:IGameLoop,IDisposable
             s.FobCommsOnline,s.VillagePoliceOnline,s.BazaarPoliceOnline,
             s.InsurrectionActive,s.Objective,s.Winner,
             players,civilians,
+            s.Forensics.Database.TakeLast(6).Select(e=>new IntelSummary(e.Id,e.Kind.ToString(),e.Reference,e.Summary,e.Verified)).ToArray(),
             s.Schedules.Active is { } q
                 ?new(q.Id,q.Kind.ToString(),q.District.ToString(),(int)Math.Ceiling(q.RemainingSeconds),q.AssignedFaction.ToString(),q.Reward)
                 :null);
