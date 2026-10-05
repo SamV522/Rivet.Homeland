@@ -186,6 +186,9 @@ internal sealed class HomelandGame:IGameLoop,IDisposable
             s.FobCommsOnline,s.VillagePoliceOnline,s.BazaarPoliceOnline,
             s.InsurrectionActive,s.Objective,s.Winner,
             players,civilians,
+            (_playerActors?.CaptureCorpses()??[]).Select(c=>new CorpseSummary(
+                c.IdentityId,c.Name,c.Faction.ToString(),c.Outfit,
+                c.Position.X,c.Position.Y,c.Position.Z)).ToArray(),
             s.Forensics.Database.TakeLast(6).Select(e=>new IntelSummary(e.Id,e.Kind.ToString(),e.Reference,e.Summary,e.Verified)).ToArray(),
             s.Schedules.Active is { } q
                 ?new(q.Id,q.Kind.ToString(),q.District.ToString(),(int)Math.Ceiling(q.RemainingSeconds),q.AssignedFaction.ToString(),q.Reward)
