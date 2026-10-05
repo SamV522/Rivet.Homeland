@@ -78,7 +78,7 @@ internal sealed class HomelandNetwork:IDisposable
 [Flags]
 internal enum HomelandButtons:ushort
 {
-    None=0,Interact=1,Recruit=2,CallToArms=4,Scramble=8,Fire=16,Cuff=32,Release=64,AbandonLife=128
+    None=0,Interact=1,Recruit=2,CallToArms=4,Scramble=8,Fire=16,Cuff=32,Release=64,AbandonLife=128,CycleSpawn=256
 }
 
 internal sealed record HomelandInput(float MoveX,float MoveZ,float AimX,float AimZ,HomelandButtons Buttons);
@@ -88,6 +88,9 @@ internal sealed record HomelandSync(
     float TimeRemaining,
     int CisfTickets,
     int HlaTickets,
+    bool FobOnline,
+    bool VillagePoliceOnline,
+    bool BazaarPoliceOnline,
     bool Insurrection,
     string Objective,
     string? Winner,
@@ -95,7 +98,7 @@ internal sealed record HomelandSync(
     CivilianSummary[] Civilians,
     ScheduleSummary? Schedule)
 {
-    public static HomelandSync Empty=>new(0,0,0,false,"Connecting...",null,[],[],null);
+    public static HomelandSync Empty=>new(0,0,0,true,true,true,false,"Connecting...",null,[],[],null);
 }
 
 internal sealed record PlayerSummary(
@@ -108,6 +111,7 @@ internal sealed record PlayerSummary(
     string Outfit,
     bool Masked,
     string Equipment,
+    string SpawnPreference,
     float X,float Y,float Z);
 
 internal sealed record CivilianSummary(
