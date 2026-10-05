@@ -10,14 +10,27 @@ internal static class HomelandAssets
         var exts=new HashSet<string>(StringComparer.OrdinalIgnoreCase){".glb",".gltf",".obj",".fbx"};
         foreach(var r in roots.Where(Directory.Exists))
         {
-            var files=Directory.EnumerateFiles(r,"*.*",SearchOption.AllDirectories).Where(f=>exts.Contains(Path.GetExtension(f))).OrderBy(f=>Path.GetExtension(f).Equals(".glb",StringComparison.OrdinalIgnoreCase)?0:1);
-            var hit=files.FirstOrDefault(f=>tokens.All(t=>Path.GetFileNameWithoutExtension(f).Contains(t,StringComparison.OrdinalIgnoreCase)))??files.FirstOrDefault(f=>tokens.Any(t=>Path.GetFileNameWithoutExtension(f).Contains(t,StringComparison.OrdinalIgnoreCase)));
+            var files=Directory.EnumerateFiles(r,"*.*",SearchOption.AllDirectories)
+                .Where(f=>exts.Contains(Path.GetExtension(f)))
+                .OrderBy(f=>Path.GetExtension(f).Equals(".glb",StringComparison.OrdinalIgnoreCase)?0:1)
+                .ThenBy(f=>f,StringComparer.OrdinalIgnoreCase)
+                .ToArray();
+            var hit=files.FirstOrDefault(f=>tokens.All(t=>Path.GetFileNameWithoutExtension(f).Contains(t,StringComparison.OrdinalIgnoreCase)))
+                ??files.FirstOrDefault(f=>tokens.Any(t=>Path.GetFileNameWithoutExtension(f).Contains(t,StringComparison.OrdinalIgnoreCase)));
             if(hit is not null)return Cache[key]=hit;
         }
         return Cache[key]=null;
     }
-    public static string? Civilian()=>Find("character")??Find("human");
-    public static string? Cisf()=>Find("soldier")??Find("police");
+    public static string? Civilian(string? outfit=null)
+    {
+        if(!string.IsNullOrWhiteSpace(outfit))
+        {
+            var exact=Find("character",outfit)??Find(outfit);
+            if(exact is not null)return exact;
+        }
+        return Find("character")??Find("human");
+    }
+    public static string? Cisf()=>Find("soldier")??Find("police")??Civilian("utility");
     public static string? Car()=>Find("car");
     public static string? Truck()=>Find("truck");
     public static string? House()=>Find("house");
