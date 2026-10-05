@@ -86,11 +86,48 @@ internal sealed class CivilianDirector
         }
     }
 
+    public void OrderFollow(District district,int leaderIdentity)
+    {
+        foreach(var c in Civilians.Where(c=>c.District==district&&c.Rebel&&c.CalledToArms&&!c.Incarcerated&&!c.PlayerControlled))
+        {
+            c.FollowIdentityId=leaderIdentity;
+            c.AttackOrdered=false;
+            c.ScrambleRequested=false;
+            c.CurrentActivity="Following HLA leader";
+        }
+    }
+
+    public void OrderGoHere(District district,Vec3Like target)
+    {
+        foreach(var c in Civilians.Where(c=>c.District==district&&c.Rebel&&c.CalledToArms&&!c.Incarcerated&&!c.PlayerControlled))
+        {
+            c.FollowIdentityId=null;
+            c.AttackOrdered=false;
+            c.RallyX=target.X;
+            c.RallyZ=target.Z;
+            c.ScrambleRequested=false;
+            c.CurrentActivity="Moving to ordered position";
+        }
+    }
+
+    public void OrderAttack(District district)
+    {
+        foreach(var c in Civilians.Where(c=>c.District==district&&c.Rebel&&c.CalledToArms&&!c.Incarcerated&&!c.PlayerControlled))
+        {
+            c.FollowIdentityId=null;
+            c.AttackOrdered=true;
+            c.ScrambleRequested=false;
+            c.CurrentActivity="Preparing to attack CISF";
+        }
+    }
+
     public void Scramble(District district)
     {
         foreach(var c in Civilians.Where(c=>c.District==district&&c.Rebel&&c.CalledToArms&&!c.PlayerControlled))
         {
             c.ScrambleRequested=true;
+            c.FollowIdentityId=null;
+            c.AttackOrdered=false;
             c.CurrentActivity="Scrambling back into civilian life";
         }
     }
@@ -132,3 +169,6 @@ internal sealed class CivilianDirector
         return local.Average(c=>Math.Clamp(c.HlaAlignment*.45f+c.Anger*.35f+(c.Rebel?.2f:0)-c.Fear*.12f,0,1));
     }
 }
+
+
+internal readonly record struct Vec3Like(float X,float Z);
