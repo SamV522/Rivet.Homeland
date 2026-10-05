@@ -96,7 +96,6 @@ internal sealed class PlayerActorSystem : IDisposable
 
         var old=runtime.IdentityId;
         runtime.IdentityId=player.Identity.Id;
-        runtime.Entity.Name=$"Player:{player.Slot}:{player.Faction}:{player.Identity.Id}";
         runtime.Entity.SetTransform(runtime.Entity.Transform with{Position=SpawnPosition(player)});
         runtime.Entity.SetTint(player.Faction==Faction.Cisf?new Vec3(.28f,.40f,.34f):new Vec3(.66f,.57f,.44f));
         runtime.Aim=new Vec3(0,0,1);
