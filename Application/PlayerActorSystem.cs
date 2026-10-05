@@ -35,9 +35,10 @@ internal sealed class PlayerActorSystem : IDisposable
             .SetTint(player.Faction==Faction.Cisf?new Vec3(.28f,.40f,.34f):new Vec3(.66f,.57f,.44f));
 
         var model=player.Faction==Faction.Cisf?HomelandAssets.Cisf():HomelandAssets.Civilian(player.PresentedAppearance.Outfit);
-        if(model is not null)entity.SetModel(model);else entity.AddTag("DebugVisible");
+        var visual=CreateHumanVisual(entity,$"Player {player.Slot} visual",model);
+        if(model is null)entity.AddTag("DebugVisible");
 
-        _actors[player.Slot]=new(player,entity,player.Identity.Id);
+        _actors[player.Slot]=new(player,entity,visual,player.Identity.Id);
         if(player.Faction==Faction.Hla)_civilians.SetPlayerControlled(player.Identity.Id,true);
     }
 
@@ -121,7 +122,11 @@ internal sealed class PlayerActorSystem : IDisposable
 
         var model=player.Faction==Faction.Cisf?HomelandAssets.Cisf():HomelandAssets.Civilian(player.PresentedAppearance.Outfit);
         if(model is not null)
-            corpse.SetModel(model).SetTransform(new Transform(position,new Vec3(0,0,90),One()));
+        {
+            var visual=corpse.CreateChild($"Corpse {player.Identity.Id} visual")
+                .SetLocalTransform(new Transform(Vec3.Zero,new Vec3(0,0,90),HomelandAssets.HumanVisualScale(model)))
+                .SetModel(model);
+        }
         else corpse.AddTag("DebugVisible");
 
         _corpses.Add(new CorpseRuntime(
@@ -141,7 +146,7 @@ internal sealed class PlayerActorSystem : IDisposable
         runtime.IdentityId=player.Identity.Id;
         runtime.Entity.SetTransform(runtime.Entity.Transform with{Position=SpawnPosition(player)});
         var model=player.Faction==Faction.Cisf?HomelandAssets.Cisf():HomelandAssets.Civilian(player.PresentedAppearance.Outfit);
-        if(model is not null)runtime.Entity.SetModel(model);
+        UpdateHumanVisual(runtime.Visual,model);
         runtime.Entity.SetVisible(true);
         runtime.Entity.SetTint(player.Faction==Faction.Cisf?new Vec3(.28f,.40f,.34f):new Vec3(.66f,.57f,.44f));
         runtime.Aim=new Vec3(0,0,1);
@@ -362,6 +367,21 @@ internal sealed class PlayerActorSystem : IDisposable
         .Select(c=>new CorpseRuntimeSummary(c.IdentityId,c.Name,c.Faction,c.Outfit,c.Entity.Transform.Position))
         .ToArray();
 
+    private static Entity? CreateHumanVisual(Entity root,string name,string? model)
+    {
+        if(model is null)return null;
+        return root.CreateChild(name)
+            .SetLocalTransform(new Transform(Vec3.Zero,Vec3.Zero,HomelandAssets.HumanVisualScale(model)))
+            .SetModel(model);
+    }
+
+    private static void UpdateHumanVisual(Entity? visual,string? model)
+    {
+        if(visual is null||model is null)return;
+        visual.SetModel(model)
+            .SetLocalTransform(new Transform(Vec3.Zero,Vec3.Zero,HomelandAssets.HumanVisualScale(model)));
+    }
+
     public void Dispose()
     {
         if(_disposed)return;_disposed=true;
@@ -375,10 +395,11 @@ internal sealed class PlayerActorSystem : IDisposable
     private static float Dot(Vec3 a,Vec3 b)=>a.X*b.X+a.Z*b.Z;
     private static Vec3 One()=>new(1,1,1);
 
-    private sealed class Runtime(PlayerLife player,Entity entity,int identityId)
+    private sealed class Runtime(PlayerLife player,Entity entity,Entity? visual,int identityId)
     {
         public PlayerLife Player { get; }=player;
         public Entity Entity { get; }=entity;
+        public Entity? Visual { get; }=visual;
         public int IdentityId { get; set; }=identityId;
         public HomelandButtons Previous { get; set; }
         public Vec3 Aim { get; set; }=new(0,0,1);
