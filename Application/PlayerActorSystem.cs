@@ -11,6 +11,7 @@ internal sealed class PlayerActorSystem : IDisposable
     private readonly HomelandSimulation _simulation;
     private readonly CivilianAgentSystem _civilians;
     private readonly Dictionary<int,Runtime> _actors=[];
+    private readonly List<CorpseRuntime> _corpses=[];
     private bool _disposed;
 
     public PlayerActorSystem(World world,HomelandWorld scene,HomelandSimulation simulation,CivilianAgentSystem civilians)
@@ -45,6 +46,7 @@ internal sealed class PlayerActorSystem : IDisposable
         foreach(var runtime in _actors.Values)
         {
             var player=runtime.Player;
+            HandleLifeStateTransition(runtime);
             HandleIdentityTransition(runtime);
 
             var input=player.PeerId is { } peer
@@ -59,6 +61,7 @@ internal sealed class PlayerActorSystem : IDisposable
             {
                 controller.Move(Vec3.Zero);
                 runtime.Previous=input.Buttons;
+                runtime.LastState=player.State;
                 continue;
             }
 
@@ -86,7 +89,47 @@ internal sealed class PlayerActorSystem : IDisposable
             if((pressed&HomelandButtons.GoHere)!=0)_simulation.OrderGoHere(player,runtime.Entity.Transform.Position,runtime.Aim);
             if((pressed&HomelandButtons.Attack)!=0)_simulation.OrderAttack(player,runtime.Entity.Transform.Position);
             if((input.Buttons&HomelandButtons.Fire)!=0&&runtime.FireCooldown<=0)Fire(runtime);
+            runtime.LastState=player.State;
         }
+    }
+
+    private void HandleLifeStateTransition(Runtime runtime)
+    {
+        var player=runtime.Player;
+        if(player.State==LifeState.Dead&&runtime.LastState!=LifeState.Dead)
+        {
+            SpawnCorpse(runtime);
+            runtime.Entity.SetVisible(false);
+            var p=runtime.Entity.Transform.Position;
+            runtime.Entity.SetTransform(runtime.Entity.Transform with{Position=new Vec3(p.X,-25,p.Z)});
+        }
+        else if(player.State==LifeState.Active&&runtime.LastState==LifeState.Dead)
+        {
+            runtime.Entity.SetVisible(true);
+        }
+    }
+
+    private void SpawnCorpse(Runtime runtime)
+    {
+        var player=runtime.Player;
+        var position=runtime.Entity.Transform.Position;
+        var corpse=_world.Spawn($"Corpse:{player.Identity.Id}:{player.Identity.First}:{player.Identity.Last}")
+            .SetTransform(new Transform(position,Vec3.Zero,One()))
+            .SetBounds(new Vec3(.34f,.18f,.78f),new Vec3(0,.18f,0))
+            .SetTint(player.Faction==Faction.Cisf?new Vec3(.25f,.34f,.29f):new Vec3(.56f,.47f,.36f))
+            .SetInteraction($"Inspect {player.Identity.First} {player.Identity.Last}","homeland.corpse");
+
+        var model=player.Faction==Faction.Cisf?HomelandAssets.Cisf():HomelandAssets.Civilian(player.PresentedAppearance.Outfit);
+        if(model is not null)
+            corpse.SetModel(model).SetTransform(new Transform(position,new Vec3(0,0,90),One()));
+        else corpse.AddTag("DebugVisible");
+
+        _corpses.Add(new CorpseRuntime(
+            player.Identity.Id,
+            $"{player.Identity.First} {player.Identity.Last}",
+            player.Faction,
+            player.PresentedAppearance.Outfit,
+            corpse));
     }
 
     private void HandleIdentityTransition(Runtime runtime)
@@ -97,6 +140,9 @@ internal sealed class PlayerActorSystem : IDisposable
         var old=runtime.IdentityId;
         runtime.IdentityId=player.Identity.Id;
         runtime.Entity.SetTransform(runtime.Entity.Transform with{Position=SpawnPosition(player)});
+        var model=player.Faction==Faction.Cisf?HomelandAssets.Cisf():HomelandAssets.Civilian(player.PresentedAppearance.Outfit);
+        if(model is not null)runtime.Entity.SetModel(model);
+        runtime.Entity.SetVisible(true);
         runtime.Entity.SetTint(player.Faction==Faction.Cisf?new Vec3(.28f,.40f,.34f):new Vec3(.66f,.57f,.44f));
         runtime.Aim=new Vec3(0,0,1);
 
@@ -311,11 +357,18 @@ internal sealed class PlayerActorSystem : IDisposable
         return new PlayerRuntimeSummary(r.Player.Slot,r.Player.PeerId,r.Player.Identity.Id,p,r.Aim);
     }).ToArray();
 
+    public CorpseRuntimeSummary[] CaptureCorpses()=>_corpses
+        .Where(c=>c.Entity.IsAlive)
+        .Select(c=>new CorpseRuntimeSummary(c.IdentityId,c.Name,c.Faction,c.Outfit,c.Entity.Transform.Position))
+        .ToArray();
+
     public void Dispose()
     {
         if(_disposed)return;_disposed=true;
         foreach(var r in _actors.Values)if(r.Entity.IsAlive)r.Entity.Destroy();
+        foreach(var c in _corpses)if(c.Entity.IsAlive)c.Entity.Destroy();
         _actors.Clear();
+        _corpses.Clear();
     }
 
     private static Vec3 Flat(Vec3 v)=>new(v.X,0,v.Z);
@@ -330,8 +383,10 @@ internal sealed class PlayerActorSystem : IDisposable
         public HomelandButtons Previous { get; set; }
         public Vec3 Aim { get; set; }=new(0,0,1);
         public float FireCooldown { get; set; }
+        public LifeState LastState { get; set; }=player.State;
     }
 
+    private sealed record CorpseRuntime(int IdentityId,string Name,Faction Faction,string Outfit,Entity Entity);
     private sealed record CivilianCandidate(CivilianState State,Vec3 Position);
 }
 
@@ -339,3 +394,6 @@ internal sealed record PlayerRuntimeSummary(int Slot,uint? PeerId,int IdentityId
 
 
 internal sealed record PlayerCombatTarget(PlayerLife Life,Entity Entity,Vec3 Position);
+
+
+internal sealed record CorpseRuntimeSummary(int IdentityId,string Name,Faction Faction,string Outfit,Vec3 Position);
