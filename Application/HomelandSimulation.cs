@@ -143,7 +143,7 @@ internal sealed class HomelandSimulation
         c.AvailableAsHlaTicket=false;
         c.CalledToArms=false;
         c.Armed=false;
-        Civilians.RelationshipShock(c.Identity.Id,.22f,attacker==Faction.Cisf?.10f:0,attacker==Faction.Hla?-.12f:0);
+        Civilians.RelationshipShock(c.Identity.Id,.22f,attacker==Faction.Cisf ? .10f : 0,attacker==Faction.Hla ? -.12f : 0);
     }
 
     public void Kill(PlayerLife p)
