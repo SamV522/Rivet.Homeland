@@ -216,6 +216,7 @@ internal sealed class PlayerActorSystem : IDisposable
             var delta=Flat(target.Entity.Transform.Position-origin);
             var distance=delta.Length;if(distance<.1f||distance>35)continue;
             if(Dot(delta.Normalized,aim)<.965f)continue;
+            if(!ClearShot(origin,target.Entity.Transform.Position,target.Entity))continue;
             if(distance<bestDistance){bestDistance=distance;bestPlayer=target;bestCivilian=null;}
         }
 
@@ -225,6 +226,7 @@ internal sealed class PlayerActorSystem : IDisposable
             var delta=Flat(p-origin);
             var distance=delta.Length;if(distance<.1f||distance>35)continue;
             if(Dot(delta.Normalized,aim)<.965f)continue;
+            if(!ClearShot(origin,p,null))continue;
             if(distance<bestDistance){bestDistance=distance;bestCivilian=new(c,p);bestPlayer=null;}
         }
 
@@ -244,6 +246,17 @@ internal sealed class PlayerActorSystem : IDisposable
             _simulation.Civilians.AddWitness(witness.Identity.Id,shooter.Player.Identity.Id,
                 $"Saw {shooter.Player.Identity.First} {shooter.Player.Identity.Last} fire a weapon",true,1);
         }
+    }
+
+    private bool ClearShot(Vec3 origin,Vec3 target,Entity? targetEntity)
+    {
+        var from=origin+new Vec3(0,1.0f,0);
+        var to=target+new Vec3(0,1.0f,0);
+        var delta=to-from;
+        var distance=delta.Length;
+        if(distance<.01f)return true;
+        var hit=_world.Raycast(from,delta.Normalized,distance);
+        return hit is null||targetEntity is not null&&hit.Value.Entity==targetEntity;
     }
 
     private Runtime? NearestPlayer(Runtime source,float range,Func<PlayerLife,bool> predicate)
