@@ -75,7 +75,8 @@ internal sealed class HomelandGame:IGameLoop,IDisposable
             {
                 var hostInput=_options.Dedicated?IdleInput():ReadInput();
                 _playerActors!.FixedUpdate(dt,hostInput,_peerInputs);
-                _civilianAgents!.FixedUpdate(dt);
+                _civilianAgents!.FixedUpdate(dt,_playerActors.IdentityPositions());
+                _civilianAgents.UpdateRebelCombat(dt,_playerActors.CombatTargets(),_sim!);
                 _sim!.Update(dt);
                 _syncRemaining-=dt;
                 if(_syncRemaining<=0)Broadcast();
@@ -142,6 +143,9 @@ internal sealed class HomelandGame:IGameLoop,IDisposable
         if(_engine.Input.Down(Key.X))buttons|=HomelandButtons.Release;
         if(_engine.Input.Down(Key.K))buttons|=HomelandButtons.AbandonLife;
         if(_engine.Input.Down(Key.P))buttons|=HomelandButtons.CycleSpawn;
+        if(_engine.Input.Down(Key.Q))buttons|=HomelandButtons.Follow;
+        if(_engine.Input.Down(Key.V))buttons|=HomelandButtons.GoHere;
+        if(_engine.Input.Down(Key.B))buttons|=HomelandButtons.Attack;
         return new(move.X,move.Z,aim.X,aim.Z,buttons);
     }
 
