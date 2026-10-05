@@ -8,38 +8,15 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout Homeland
-        uses: actions/checkout@v4
-        with:
-          path: Rivet.Homeland
+      - name: Environment
+        run: |
+          dotnet --info
+          git --version
 
-      - name: Checkout Rivet
-        uses: actions/checkout@v4
-        with:
-          repository: SamV522/Rivet
-          path: Rivet
-
-      - name: Setup .NET 10
-        uses: actions/setup-dotnet@v4
-        with:
-          dotnet-version: 10.0.x
+      - name: Checkout sources
+        run: |
+          git clone --depth 1 --branch homeland-playable-validation https://github.com/SamV522/Rivet.Homeland.git Rivet.Homeland
+          git clone --depth 1 https://github.com/SamV522/Rivet.git Rivet
 
       - name: Build Homeland
-        id: build
-        shell: bash
-        run: |
-          set +e
-          dotnet build Rivet.Homeland/Rivet.Homeland.csproj -c Release -p:RivetRoot="$GITHUB_WORKSPACE/Rivet" 2>&1 | tee homeland-build.log
-          code=${PIPESTATUS[0]}
-          echo "exit_code=$code" >> "$GITHUB_OUTPUT"
-          exit 0
-
-      - name: Upload build log
-        uses: actions/upload-artifact@v4
-        with:
-          name: homeland-build-log
-          path: homeland-build.log
-
-      - name: Fail if build failed
-        if: steps.build.outputs.exit_code != '0'
-        run: exit 1
+        run: dotnet build Rivet.Homeland/Rivet.Homeland.csproj -c Release -p:RivetRoot="$GITHUB_WORKSPACE/Rivet"
