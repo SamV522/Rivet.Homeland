@@ -274,21 +274,21 @@ internal sealed class HomelandWorld : IDisposable
     {
         if(schedule is null||!Enum.TryParse<ScheduleKind>(schedule.Kind,out var kind)||!Enum.TryParse<District>(schedule.District,out var district))
         {
-            if(_scheduleMarker is { IsAlive:true } old)old.SetVisible(false);
+            if(_scheduleMarker is { } old && old.IsAlive) old.SetVisible(false);
             _scheduleMarkerId=0;
             return;
         }
 
         var p=SchedulePosition(kind,district);
-        if(_scheduleMarker is not { IsAlive:true })
+        if(_scheduleMarker is not { } marker || !marker.IsAlive)
         {
             _scheduleMarker=_world.Spawn("Schedule objective marker")
                 .SetBounds(new Vec3(.45f,.08f,.45f),Vec3.Zero)
                 .SetTint(new Vec3(.95f,.62f,.18f))
                 .AddTag("DebugVisible");
-            _entities.Add(_scheduleMarker.Value);
+            _entities.Add(_scheduleMarker);
         }
-        _scheduleMarker.Value
+        _scheduleMarker
             .SetTransform(new Transform(p+new Vec3(0,.10f,0),Vec3.Zero,One()))
             .SetVisible(true);
         _scheduleMarkerId=schedule.Id;
