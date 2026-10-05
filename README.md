@@ -1,65 +1,101 @@
 # Homeland
 
-Homeland is an asymmetric top-down insurgency / counter-insurgency game built on Rivet. Liberation is the first mode: CISF players try to keep order and build an intelligence picture while embedded HLA Insurgents recruit locals, hide among the population and eventually turn local anger into an organic insurrection.
+Homeland is an asymmetric top-down insurgency / counter-insurgency game built on Rivet. Liberation is the first mode: CISF players try to keep order and build an intelligence picture while embedded HLA Insurgents recruit locals, hide among the population and can turn local anger into an organic insurrection.
 
-## First playable scope
+## Current playable slice
 
-- 5–16 player target, but low counts including 1v1 are supported.
-- Roughly 70/30 CISF/HLA team bias.
-- 45 minute default Liberation timeout. CISF wins at timeout only when there is no active insurrection; an active insurrection must finish.
+- 5–16 player target with very small matches supported; team allocation biases roughly 70/30 toward CISF while still producing HLA opposition when multiple players are present.
+- 45 minute default Liberation timeout. CISF does not receive the timeout win while an insurrection is active.
 - Three connected districts: rural/village, bazaar and CBD.
-- CISF FOB plus police-station spawn choices. FOB communications tower is the strategic sabotage target.
-- Finite CISF reinforcement tickets, increased by reinforcement schedules.
-- HLA reinforcement tickets are actual recruited Rebel civilians. Respawn assumes a random available Rebel identity wherever that NPC was.
-- Downed, bleed-out, capture, cuffs, detention, release and ticket-cost abandonment of an imprisoned life.
-- Civilian alignment, fear, anger, individual opinion and relationship propagation.
-- Quiet HLA recruitment and district-level readiness leading to an organic insurrection objective: **SURVIVE THE INSURRECTION**.
-- Deterministic generated identity/dossier data, manual CISF database entry and player-authored notes.
-- Fingerprint, blood and ballistic signatures. Evidence records facts rather than automatically declaring guilt.
-- Schedule system for convoys, checkpoints, patrols, briefings, HVT transfers and reinforcement trucks.
-- Steam P2P networking via Rivet's `SteamP2PTransport`, with UDP retained for local testing.
-- Main menu / lobby / Homeland settings structure based on Rivet.Kickback.
-- CC0 third-party asset discovery for characters/clothes, vehicles, buildings and roads, with primitive fallback.
+- Physical CISF/HLA player actors using Rivet CharacterController.
+- Server-authoritative movement, combat, damage, downed/bleed-out, stabilization, death, respawn, cuffs, detention and release.
+- Persistent corpses: a player respawning as a new identity no longer removes the previous identity's body.
+- Finite CISF reinforcement tickets.
+- CISF FOB and village/bazaar police spawn sites. HLA can sabotage FOB communications or take police stations; CISF can retake police stations and cycle available respawn sites.
+- HLA reinforcement lives are actual recruited Rebel civilians. An HLA respawn takes over a random available Rebel at that civilian's current physical location.
+- A physical civilian population driven by server-authoritative GOAP and Rivet Navigation/Jolt rather than a timer-only activity loop.
+- Civilian home/work/bazaar routines, danger response, fleeing, witness memory and reporting.
+- Civilian alignment, fear, anger, personal opinion and relationship propagation.
+- Quiet HLA recruitment immediately adds that real civilian to the future HLA reinforcement pool.
+- Local Call to Arms. Recruited Rebels can retrieve weapons, rally, follow an HLA player, move to an ordered point, attack CISF or scramble back into civilian life.
+- Armed Rebel NPCs navigate toward CISF and fight as deliberately mediocre/shaky combatants.
+- District readiness can organically trigger SURVIVE THE INSURRECTION.
+- Schedules are timed world objectives with physical markers and faction consequences; CISF reinforcement-truck success adds tickets.
+- Deterministic identities/dossiers plus a factual forensics/evidence model.
+- First-hand witness reports physically travel through the civilian GOAP loop and then become shared CISF intelligence.
+- Steam P2P through Rivet's SteamP2PTransport, plus UDP for local testing.
+- Steam host/join/invite flow, lobby and configurable Homeland match settings.
+- Vendored CC0 Kenney roads, buildings, character models and vehicles with source/license metadata in assets/ThirdParty/Kenney/SOURCES.md.
+
+## Controls
+
+- WASD — move
+- Mouse — aim
+- Left mouse — fire
+- E — interact / search / stabilize / resolve nearby strategic interaction or Schedule
+- C — cuff
+- X — release
+- P — CISF: cycle preferred available respawn site
+- R — HLA: quietly recruit nearby civilian
+- T — HLA: local Call to Arms
+- Q — HLA: order local armed Rebels to follow
+- V — HLA: order local armed Rebels to go toward aimed position
+- B — HLA: order local armed Rebels to attack CISF
+- G — HLA: scramble local Rebels back into civilian life
+- K — abandon a detained player life where allowed
 
 ## Checkout
 
 Place Homeland beside Rivet:
 
-```text
+~~~text
 workspace/
   Rivet/
   Rivet.Homeland/
-```
+~~~
 
 Run:
 
-```powershell
+~~~powershell
 dotnet run -c Release
-```
+~~~
 
 Steam host:
 
-```powershell
+~~~powershell
 dotnet run -c Release -- --steam --steam-app-id 480
-```
+~~~
 
 Steam join by SteamID64 during development:
 
-```powershell
+~~~powershell
 dotnet run -c Release -- --steam-connect HOST_STEAMID64 --steam-app-id 480
-```
+~~~
 
 UDP test host/client:
 
-```powershell
+~~~powershell
 dotnet run -c Release -- --port 7777
 dotnet run -c Release -- --connect 127.0.0.1:7777
-```
+~~~
 
 ## Assets
 
-Run `tools/import-kickback-assets.ps1` when `Rivet.Samples` exists beside this repo to copy the already-used Quaternius CC0 asset set as a starting point. See `assets/README.md` for the intended character/outfit/vehicle/building/road packs.
+A curated baseline of Kenney CC0 assets is committed directly to the repository, so the playable does not depend on an asset-import step. tools/import-kickback-assets.ps1 remains optional for importing additional Quaternius assets already used by Rivet.Kickback.
 
-## Current implementation boundary
+## Not yet implemented in this playable slice
 
-This first repository pass establishes the authoritative systems, menus/networking and three-district world. The next implementation pass should bind physical interactions to the domain rules: character controller/combat, searches and dialogue, disguise swaps, CCTV terminals/printed photos, CISF laptop/database UI, radio voice, prisoner vehicle seats, jail doors/lockpicks, GOAP navigation, inventory persistence and spawn-at-current-NPC-location.
+These are still real Homeland requirements, but they are not represented as completed features:
+
+- full clothing/disguise swapping and face/familiarity recognition
+- CCTV terminals and printable surveillance photos
+- full CISF laptop/database editing UI and authenticated HLA database sabotage
+- physical radios and voice/radio leakage
+- prisoner vehicle seats, jail doors, lockpick escape and escorted walking
+- complete persistent inventory/stash/item concealability system
+- physical fingerprint/blood/ballistics collection workflows beyond the evidence-domain layer
+- player-authored physical notepad UI
+- full civilian dialogue/interrogation UI
+- de-escalation/allegiance-change workflow for incarcerated Rebels
+
+Those should be treated as subsequent Homeland systems, not as already-finished functionality.

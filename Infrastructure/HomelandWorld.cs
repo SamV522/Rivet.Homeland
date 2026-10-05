@@ -9,6 +9,7 @@ internal sealed class HomelandWorld : IDisposable
     private readonly List<Entity> _entities = [];
     private readonly Dictionary<int, Entity> _remoteCivilians = [];
     private readonly Dictionary<int, Entity> _remotePlayers = [];
+    private readonly Dictionary<int, Entity> _remoteCorpses = [];
     private readonly List<BuildingSpec> _buildings = [];
     private Entity? _scheduleMarker;
     private int _scheduleMarkerId;
@@ -274,21 +275,25 @@ internal sealed class HomelandWorld : IDisposable
     {
         if(schedule is null||!Enum.TryParse<ScheduleKind>(schedule.Kind,out var kind)||!Enum.TryParse<District>(schedule.District,out var district))
         {
-            if(_scheduleMarker is { IsAlive:true } old)old.SetVisible(false);
+            if(_scheduleMarker is { } old && old.IsAlive) old.SetVisible(false);
             _scheduleMarkerId=0;
             return;
         }
 
         var p=SchedulePosition(kind,district);
-        if(_scheduleMarker is not { IsAlive:true })
+        Entity marker;
+        if(_scheduleMarker is not { } existing || !existing.IsAlive)
         {
-            _scheduleMarker=_world.Spawn("Schedule objective marker")
+            marker=_world.Spawn("Schedule objective marker")
                 .SetBounds(new Vec3(.45f,.08f,.45f),Vec3.Zero)
                 .SetTint(new Vec3(.95f,.62f,.18f))
                 .AddTag("DebugVisible");
-            _entities.Add(_scheduleMarker.Value);
+            _scheduleMarker=marker;
+            _entities.Add(marker);
         }
-        _scheduleMarker.Value
+        else marker=existing;
+
+        marker
             .SetTransform(new Transform(p+new Vec3(0,.10f,0),Vec3.Zero,One()))
             .SetVisible(true);
         _scheduleMarkerId=schedule.Id;
@@ -305,6 +310,7 @@ internal sealed class HomelandWorld : IDisposable
     {
         ApplyRemoteCivilians(state.Civilians);
         ApplyRemotePlayers(state.Players);
+        ApplyRemoteCorpses(state.Corpses);
     }
 
     private void ApplyRemoteCivilians(IReadOnlyList<CivilianSummary> states)
@@ -349,6 +355,28 @@ internal sealed class HomelandWorld : IDisposable
         }
     }
 
+    private void ApplyRemoteCorpses(IReadOnlyList<CorpseSummary> states)
+    {
+        var live=states.Select(s=>s.IdentityId).ToHashSet();
+        foreach(var id in _remoteCorpses.Keys.Where(id=>!live.Contains(id)).ToArray())
+        {
+            if(_remoteCorpses[id].IsAlive)_remoteCorpses[id].Destroy();
+            _remoteCorpses.Remove(id);
+        }
+
+        foreach(var s in states)
+        {
+            if(!_remoteCorpses.TryGetValue(s.IdentityId,out var corpse))
+            {
+                var model=s.Faction==Faction.Cisf.ToString()?HomelandAssets.Cisf():HomelandAssets.Civilian(s.Outfit);
+                corpse=SpawnRemoteHuman($"Corpse {s.Name}",model,new Vec3(.40f,.34f,.29f));
+                corpse.SetInteraction($"Inspect {s.Name}","homeland.corpse");
+                _remoteCorpses.Add(s.IdentityId,corpse);
+            }
+            corpse.SetTransform(new Transform(new Vec3(s.X,s.Y,s.Z),new Vec3(0,0,90),One()));
+        }
+    }
+
     private Entity SpawnRemoteHuman(string name, string? model, Vec3 tint)
     {
         var e = _world.Spawn(name).SetTint(tint);
@@ -365,6 +393,7 @@ internal sealed class HomelandWorld : IDisposable
         foreach (var e in _entities) if (e.IsAlive) e.Destroy();
         _remoteCivilians.Clear();
         _remotePlayers.Clear();
+        _remoteCorpses.Clear();
         Navigation?.Dispose();
         _entities.Clear();
     }

@@ -9,14 +9,15 @@ internal sealed class CivilianAgentSystem : IDisposable
     private readonly World _world;
     private readonly HomelandWorld _scene;
     private readonly CivilianDirector _director;
+    private readonly Forensics _forensics;
     private readonly Dictionary<int,Runtime> _agents=[];
     private readonly IReadOnlyList<GoapAction> _actions;
     private float _clock;
     private bool _disposed;
 
-    public CivilianAgentSystem(World world,HomelandWorld scene,CivilianDirector director)
+    public CivilianAgentSystem(World world,HomelandWorld scene,HomelandSimulation simulation)
     {
-        _world=world;_scene=scene;_director=director;
+        _world=world;_scene=scene;_director=simulation.Civilians;_forensics=simulation.Forensics;
         _actions=
         [
             new("Flee to safety",CivilianFact.InDanger,CivilianFact.AtSafePlace,CivilianFact.AtSafePlace,
@@ -210,7 +211,11 @@ internal sealed class CivilianAgentSystem : IDisposable
         switch(action.Name)
         {
             case "Report what I saw":
-                _director.MarkWitnessesReported(c);
+                foreach(var memory in c.Memories.Where(m=>!m.Reported).ToArray())
+                {
+                    _forensics.Log(_forensics.WitnessStatement(c.Identity.Id,memory));
+                    memory.Reported=true;
+                }
                 c.CurrentActivity="Reported what they witnessed to CISF";
                 break;
             case "Retrieve hidden weapon":
@@ -290,20 +295,42 @@ internal sealed class CivilianAgentSystem : IDisposable
         return hit is null||hit.Value.Entity==target;
     }
 
-    public Vec3 Position(int identityId)=>_agents.TryGetValue(identityId,out var r)?r.Entity.Transform.Position:Vec3.Zero;
-    public Entity? EntityFor(int identityId)=>_agents.TryGetValue(identityId,out var r)?r.Entity:null;
+    public Vec3 Position(int identityId)
+    {
+        if(!_agents.TryGetValue(identityId,out var r))return Vec3.Zero;
+        return r.State.PlayerControlled&&r.ControlledPosition is { } controlled
+            ? controlled
+            : r.Entity.Transform.Position;
+    }
+
+    public Entity? EntityFor(int identityId)=>
+        _agents.TryGetValue(identityId,out var r)&&!r.State.PlayerControlled?r.Entity:null;
 
     public void SetPlayerControlled(int identityId,bool controlled)
     {
         if(!_agents.TryGetValue(identityId,out var r))return;
-        r.State.PlayerControlled=controlled;
-        if(controlled)r.Agent.Stop();
+        if(controlled)
+        {
+            r.ControlledPosition=r.Entity.Transform.Position;
+            r.State.PlayerControlled=true;
+            r.Agent.Stop();
+            r.Entity.SetTransform(r.Entity.Transform with{Position=new Vec3(r.Entity.Transform.Position.X,-20,r.Entity.Transform.Position.Z)});
+            r.Entity.SetVisible(false);
+            return;
+        }
+
+        r.State.PlayerControlled=false;
+        if(r.ControlledPosition is { } returnPosition)
+            r.Entity.SetTransform(r.Entity.Transform with{Position=_scene.Project(returnPosition)});
+        r.ControlledPosition=null;
+        r.Entity.SetVisible(true);
+        r.ReplanRemaining=0;
     }
 
     public void SetControlledPosition(int identityId,Vec3 position)
     {
         if(!_agents.TryGetValue(identityId,out var r)||!r.State.PlayerControlled)return;
-        r.Entity.SetTransform(r.Entity.Transform with{Position=position});
+        r.ControlledPosition=position;
     }
 
     public void KillIdentity(int identityId)
@@ -363,6 +390,7 @@ internal sealed class CivilianAgentSystem : IDisposable
         public IReadOnlyList<GoapAction> Plan { get; set; }=[];
         public float CombatCooldown { get; set; }
         public float CombatRepath { get; set; }
+        public Vec3? ControlledPosition { get; set; }
     }
 
     private static bool Arrived(Runtime r)=>r.Agent.Destination is not null&&r.Agent.RemainingDistance<=r.Agent.StoppingDistance+.2f;

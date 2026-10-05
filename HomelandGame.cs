@@ -52,7 +52,7 @@ internal sealed class HomelandGame:IGameLoop,IDisposable
     {
         if(!_options.IsHost||_started)return;
         _sim=new HomelandSimulation(_settings);
-        _civilianAgents=new CivilianAgentSystem(_world,_scene,_sim.Civilians);
+        _civilianAgents=new CivilianAgentSystem(_world,_scene,_sim);
         _civilianAgents.SpawnAll();
         _sim.StartRoster(_network.PeerIds,_options.Dedicated);
         _playerActors=new PlayerActorSystem(_world,_scene,_sim,_civilianAgents);
@@ -78,6 +78,9 @@ internal sealed class HomelandGame:IGameLoop,IDisposable
                 _civilianAgents!.FixedUpdate(dt,_playerActors.IdentityPositions());
                 _civilianAgents.UpdateRebelCombat(dt,_playerActors.CombatTargets(),_sim!);
                 _sim!.Update(dt);
+                _scene.UpdateScheduleMarker(_sim.Schedules.Active is { } q
+                    ? new ScheduleSummary(q.Id,q.Kind.ToString(),q.District.ToString(),(int)Math.Ceiling(q.RemainingSeconds),q.AssignedFaction.ToString(),q.Reward)
+                    : null);
                 _syncRemaining-=dt;
                 if(_syncRemaining<=0)Broadcast();
             }
@@ -89,6 +92,7 @@ internal sealed class HomelandGame:IGameLoop,IDisposable
             {
                 _network.SendInput(_world.SimulationTick,ReadInput());
                 _scene.ApplyRemoteState(_network.Remote);
+                _scene.UpdateScheduleMarker(_network.Remote.Schedule);
             }
         }
     }
@@ -182,6 +186,10 @@ internal sealed class HomelandGame:IGameLoop,IDisposable
             s.FobCommsOnline,s.VillagePoliceOnline,s.BazaarPoliceOnline,
             s.InsurrectionActive,s.Objective,s.Winner,
             players,civilians,
+            (_playerActors?.CaptureCorpses()??[]).Select(c=>new CorpseSummary(
+                c.IdentityId,c.Name,c.Faction.ToString(),c.Outfit,
+                c.Position.X,c.Position.Y,c.Position.Z)).ToArray(),
+            s.Forensics.Database.TakeLast(6).Select(e=>new IntelSummary(e.Id,e.Kind.ToString(),e.Reference,e.Summary,e.Verified)).ToArray(),
             s.Schedules.Active is { } q
                 ?new(q.Id,q.Kind.ToString(),q.District.ToString(),(int)Math.Ceiling(q.RemainingSeconds),q.AssignedFaction.ToString(),q.Reward)
                 :null);

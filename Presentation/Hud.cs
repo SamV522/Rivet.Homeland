@@ -34,6 +34,14 @@ internal sealed class Hud(Engine e)
             e.Render2D.TextBox($"SCHEDULE / {q.Kind} / {q.District} / {q.Seconds}s / {q.Assigned}\n{q.Reward}\nReach the objective and press E.",
                 v.X-478,18,460,104,14,HomelandTheme.Text);
 
+        if(local?.Faction=="Cisf"&&s.Intel.Length>0)
+        {
+            var intel=string.Join("\n",s.Intel.TakeLast(5).Select(i=>$"{i.Reference}: {i.Summary}"));
+            e.Render2D.RoundedRectangle(v.X-478,138,460,170,6,new Color4(0,0,0,.68f));
+            e.Render2D.Text("CISF INTELLIGENCE",v.X-460,150,15,HomelandTheme.Accent);
+            e.Render2D.TextBox(intel,v.X-460,178,424,116,12,HomelandTheme.Text);
+        }
+
         if(s.Winner is not null)
         {
             e.Render2D.Rectangle(0,0,v.X,v.Y,new Color4(0,0,0,.75f));

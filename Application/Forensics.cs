@@ -12,6 +12,14 @@ internal sealed class Forensics
     public EvidenceRecord SampleFingerprint(string signature,int? identity=null)=>new(_next++,EvidenceKind.Fingerprint,$"FP-SAMPLE-{_next:0000}","Recovered fingerprint",true,identity,signature);
     public EvidenceRecord SampleBlood(string signature,int? identity=null)=>new(_next++,EvidenceKind.Blood,$"BLD-SAMPLE-{_next:0000}","Recovered blood sample",true,identity,signature);
     public EvidenceRecord Projectile(string gunSignature)=>new(_next++,EvidenceKind.Ballistic,$"BAL-{_next:0000}","Recovered projectile",true,Signature:gunSignature);
+    public EvidenceRecord WitnessStatement(int witnessIdentityId,WitnessMemory memory)
+    {
+        var id=_next++;
+        var source=memory.FirstHand?"first-hand":"second-hand";
+        return new(id,EvidenceKind.WitnessStatement,$"WIT-{id:0000}",
+            $"Witness {witnessIdentityId}: {memory.Fact} ({source}, confidence {memory.Confidence:P0})",
+            false,memory.SubjectIdentityId,AuthorIdentityId:witnessIdentityId);
+    }
     public void Log(EvidenceRecord record)=>Database.Add(record);
     public bool TryManualIdentityMatch(DossierFields entered,Identity target)
     {
