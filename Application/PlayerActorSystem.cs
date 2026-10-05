@@ -377,8 +377,8 @@ internal sealed class PlayerActorSystem : IDisposable
 
     private static void UpdateHumanVisual(Entity? visual,string? model)
     {
-        if(visual is null||model is null)return;
-        visual.SetModel(model)
+        if(visual is not { } entity||model is null)return;
+        entity.SetModel(model)
             .SetLocalTransform(new Transform(Vec3.Zero,Vec3.Zero,HomelandAssets.HumanVisualScale(model)));
     }
 
