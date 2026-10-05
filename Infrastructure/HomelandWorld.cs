@@ -60,55 +60,81 @@ internal sealed class HomelandWorld : IDisposable
     private void BuildDistricts()
     {
         for (var i = 0; i < 12; i++)
-            AddBuilding(new($"Village house {i}", new Vec3(-69 + (i % 4) * 11, 1.5f, -23 + (i / 4) * 17),
-                new Vec3(4, 1.5f, 4), new Vec3(.67f, .58f, .44f), "house"));
+        {
+            var name=$"Village house {i}";
+            AddBuilding(name,new Vec3(-69+(i%4)*11,0,-23+(i/4)*17),
+                HomelandAssets.House(name),new Vec3(.67f,.58f,.44f));
+        }
 
         for (var i = 0; i < 18; i++)
-            AddBuilding(new($"Bazaar shop {i}", new Vec3(-15 + (i % 6) * 6, 1.3f, -18 + (i / 6) * 16),
-                new Vec3(2.35f, 1.3f, 4.2f), new Vec3(.73f, .59f, .39f), "building"));
+        {
+            var name=$"Bazaar shop {i}";
+            AddBuilding(name,new Vec3(-15+(i%6)*6,0,-18+(i/6)*16),
+                HomelandAssets.BazaarBuilding(name),new Vec3(.73f,.59f,.39f));
+        }
 
         for (var i = 0; i < 10; i++)
-            AddBuilding(new($"CBD block {i}", new Vec3(27 + (i % 5) * 9, 3.5f, -18 + (i / 5) * 30),
-                new Vec3(3.55f, 3.5f, 5.7f), new Vec3(.54f, .55f, .53f), "building"));
-
-        AddBuilding(new("CISF FOB", new Vec3(62, 2, -28), new Vec3(10, 2, 5), new Vec3(.28f, .31f, .30f), "building"));
-        AddBuilding(new("Police Station Bazaar", new Vec3(14, 1.6f, 26), new Vec3(5, 1.6f, 4), new Vec3(.33f, .38f, .42f), "building"));
-        AddBuilding(new("Police Station Village", new Vec3(-59, 1.6f, 26), new Vec3(5, 1.6f, 4), new Vec3(.36f, .40f, .43f), "building"));
-
-        var tower = AddSolid("FOB communications tower", new Vec3(70, 6, -27), new Vec3(.65f, 6, .65f), new Vec3(.42f, .45f, .46f));
-        tower.SetInteraction("Sabotage communications tower", "homeland.sabotage");
-
-        SpawnVehicle("CISF reinforcement truck", new Vec3(54, .7f, -18), HomelandAssets.Truck());
-        SpawnVehicle("Civilian car", new Vec3(-4, .55f, 8), HomelandAssets.Car());
-        SpawnVehicle("Civilian car 2", new Vec3(25, .55f, 7), HomelandAssets.Car());
-        SpawnVehicle("Police vehicle", new Vec3(18, .55f, 24), HomelandAssets.PoliceVehicle());
-    }
-
-    private void AddBuilding(BuildingSpec spec)
-    {
-        _buildings.Add(spec);
-        string? model = spec.AssetToken switch
         {
-            "house" => HomelandAssets.House(spec.Name),
-            _ => HomelandAssets.Building(spec.Name)
-        };
-        var e = AddSolid(spec.Name, spec.Center, spec.Half, spec.Tint, model);
-        e.SetInteraction(spec.Name, "homeland.location");
+            var name=$"CBD block {i}";
+            AddBuilding(name,new Vec3(27+(i%5)*9,0,-18+(i/5)*30),
+                HomelandAssets.CbdBuilding(name),new Vec3(.54f,.55f,.53f));
+        }
+
+        AddBuilding("CISF FOB",new Vec3(62,0,-28),HomelandAssets.FobBuilding(),new Vec3(.28f,.31f,.30f));
+        AddBuilding("Police Station Bazaar",new Vec3(14,0,26),HomelandAssets.PoliceStation("Bazaar"),new Vec3(.33f,.38f,.42f));
+        AddBuilding("Police Station Village",new Vec3(-59,0,26),HomelandAssets.PoliceStation("Village"),new Vec3(.36f,.40f,.43f));
+
+        var tower=AddSolid("FOB communications tower",new Vec3(70,6,-27),new Vec3(.65f,6,.65f),new Vec3(.42f,.45f,.46f));
+        tower.SetInteraction("Sabotage communications tower","homeland.sabotage");
+
+        SpawnVehicle("CISF reinforcement truck",new Vec3(54,0,-18),HomelandAssets.Truck());
+        SpawnVehicle("Civilian car",new Vec3(-4,0,8),HomelandAssets.Car());
+        SpawnVehicle("Civilian car 2",new Vec3(25,0,7),HomelandAssets.Car());
+        SpawnVehicle("Police vehicle",new Vec3(18,0,24),HomelandAssets.PoliceVehicle());
     }
 
-    private Entity AddGround(string name, Vec3 p, Vec3 half, Vec3 tint)
+    private void AddBuilding(string name,Vec3 groundPosition,ModelPlacement placement,Vec3 tint)
     {
-        var e = _world.Spawn(name).SetTransform(new Transform(p, Vec3.Zero, One()))
-            .SetBounds(half, Vec3.Zero).SetTint(tint).AddTag("DebugVisible")
-            .SetBody(new BodyDesc(BodyMotion.Static, half, 1, false));
+        var half=placement.ColliderHalfExtents;
+        var center=new Vec3(groundPosition.X,half.Y,groundPosition.Z);
+        _buildings.Add(new BuildingSpec(name,center,half,tint,"building"));
+
+        var root=_world.Spawn(name)
+            .SetTransform(new Transform(center,Vec3.Zero,One()))
+            .SetBounds(half,Vec3.Zero)
+            .SetTint(tint)
+            .SetBody(new BodyDesc(BodyMotion.Static,half,1,false));
+        _entities.Add(root);
+
+        if(placement.Path is not null)
+        {
+            var visual=root.CreateChild(name+" visual")
+                .SetLocalTransform(new Transform(new Vec3(0,-half.Y,0),Vec3.Zero,placement.VisualScale))
+                .SetModel(placement.Path)
+                .SetTint(tint);
+            _entities.Add(visual);
+        }
+        else
+        {
+            root.AddTag("DebugVisible");
+        }
+
+        root.SetInteraction(name,"homeland.location");
+    }
+
+    private Entity AddGround(string name,Vec3 p,Vec3 half,Vec3 tint)
+    {
+        var e=_world.Spawn(name).SetTransform(new Transform(p,Vec3.Zero,One()))
+            .SetBounds(half,Vec3.Zero).SetTint(tint).AddTag("DebugVisible")
+            .SetBody(new BodyDesc(BodyMotion.Static,half,1,false));
         _entities.Add(e);
         return e;
     }
 
-    private void AddRoad(Vec3 p, Vec3 half)
+    private void AddRoad(Vec3 p,Vec3 half)
     {
-        var e = _world.Spawn("Road base").SetTransform(new Transform(p, Vec3.Zero, One()))
-            .SetBounds(half, Vec3.Zero).SetTint(new Vec3(.18f, .18f, .17f)).AddTag("DebugVisible");
+        var e=_world.Spawn("Road base").SetTransform(new Transform(p,Vec3.Zero,One()))
+            .SetBounds(half,Vec3.Zero).SetTint(new Vec3(.18f,.18f,.17f)).AddTag("DebugVisible");
         _entities.Add(e);
 
         var model=HomelandAssets.RoadStraight();
@@ -123,31 +149,41 @@ internal sealed class HomelandWorld : IDisposable
             var offset=-halfLength+spacing*.5f+i*spacing;
             var position=p+(alongX?new Vec3(offset,.02f,0):new Vec3(0,.02f,offset));
             var visual=_world.Spawn("Kenney road tile")
-                .SetTransform(new Transform(position,new Vec3(0,alongX?90:0,0),One()))
+                .SetTransform(new Transform(position,new Vec3(0,alongX?90:0,0),new Vec3(4f,1f,4f)))
                 .SetModel(model);
             _entities.Add(visual);
         }
     }
 
-    private Entity AddSolid(string name, Vec3 p, Vec3 half, Vec3 tint, string? model = null)
+    private Entity AddSolid(string name,Vec3 p,Vec3 half,Vec3 tint)
     {
-        var e = _world.Spawn(name).SetTransform(new Transform(p, Vec3.Zero, One()))
-            .SetBounds(half, Vec3.Zero).SetTint(tint)
-            .SetBody(new BodyDesc(BodyMotion.Static, half, 1, false));
-        if (model is not null) e.SetModel(model);
-        else e.AddTag("DebugVisible");
+        var e=_world.Spawn(name).SetTransform(new Transform(p,Vec3.Zero,One()))
+            .SetBounds(half,Vec3.Zero).SetTint(tint)
+            .SetBody(new BodyDesc(BodyMotion.Static,half,1,false))
+            .AddTag("DebugVisible");
         _entities.Add(e);
         return e;
     }
 
-    private void SpawnVehicle(string name, Vec3 p, string? model)
+    private void SpawnVehicle(string name,Vec3 groundPosition,ModelPlacement placement)
     {
-        var half = new Vec3(1.05f, .65f, 2.15f);
-        var e = _world.Spawn(name).SetTransform(new Transform(p, Vec3.Zero, One()))
-            .SetBounds(half, Vec3.Zero).SetTint(new Vec3(.24f, .28f, .27f))
-            .SetBody(new BodyDesc(BodyMotion.Kinematic, half, 1200, false));
-        if (model is not null) e.SetModel(model); else e.AddTag("DebugVisible");
-        _entities.Add(e);
+        var half=placement.ColliderHalfExtents;
+        var center=new Vec3(groundPosition.X,half.Y,groundPosition.Z);
+        var root=_world.Spawn(name)
+            .SetTransform(new Transform(center,Vec3.Zero,One()))
+            .SetBounds(half,Vec3.Zero)
+            .SetTint(new Vec3(.24f,.28f,.27f))
+            .SetBody(new BodyDesc(BodyMotion.Kinematic,half,1200,false));
+        _entities.Add(root);
+
+        if(placement.Path is not null)
+        {
+            var visual=root.CreateChild(name+" visual")
+                .SetLocalTransform(new Transform(new Vec3(0,-half.Y,0),Vec3.Zero,placement.VisualScale))
+                .SetModel(placement.Path);
+            _entities.Add(visual);
+        }
+        else root.AddTag("DebugVisible");
     }
 
     private IReadOnlyList<NavigationTriangle> NavigationGeometry()
