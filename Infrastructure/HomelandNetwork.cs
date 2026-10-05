@@ -78,7 +78,7 @@ internal sealed class HomelandNetwork:IDisposable
 [Flags]
 internal enum HomelandButtons:ushort
 {
-    None=0,Interact=1,Recruit=2,CallToArms=4,Scramble=8,Fire=16,Cuff=32,Release=64,AbandonLife=128,CycleSpawn=256
+    None=0,Interact=1,Recruit=2,CallToArms=4,Scramble=8,Fire=16,Cuff=32,Release=64,AbandonLife=128,CycleSpawn=256,Follow=512,GoHere=1024,Attack=2048
 }
 
 internal sealed record HomelandInput(float MoveX,float MoveZ,float AimX,float AimZ,HomelandButtons Buttons);
