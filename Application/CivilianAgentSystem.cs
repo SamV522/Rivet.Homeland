@@ -235,6 +235,12 @@ internal sealed class CivilianAgentSystem : IDisposable
         if(controlled)r.Agent.Stop();
     }
 
+    public void SetControlledPosition(int identityId,Vec3 position)
+    {
+        if(!_agents.TryGetValue(identityId,out var r)||!r.State.PlayerControlled)return;
+        r.Entity.SetTransform(r.Entity.Transform with{Position=position});
+    }
+
     public void KillIdentity(int identityId)
     {
         if(!_agents.TryGetValue(identityId,out var r))return;
