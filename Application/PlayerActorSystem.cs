@@ -65,6 +65,7 @@ internal sealed class PlayerActorSystem : IDisposable
             var movement=new Vec3(input.MoveX,0,input.MoveZ);
             if(movement.LengthSquared>1)movement=movement.Normalized;
             controller.Move(movement*HomelandRules.WalkSpeed);
+            if(player.Faction==Faction.Hla)_civilians.SetControlledPosition(player.Identity.Id,runtime.Entity.Transform.Position);
 
             var aim=new Vec3(input.AimX,0,input.AimZ);
             if(aim.LengthSquared>.05f)runtime.Aim=aim.Normalized;
@@ -141,7 +142,7 @@ internal sealed class PlayerActorSystem : IDisposable
 
     private void Cuff(Runtime actor)
     {
-        var target=NearestPlayer(actor,1.8f,p=>p.State is LifeState.Active or LifeState.Downed&&p.Faction!=actor.Player.Faction);
+        var target=NearestPlayer(actor,1.8f,p=>(p.State is LifeState.Active or LifeState.Downed)&&p.Faction!=actor.Player.Faction);
         if(target is not null)
         {
             _simulation.Detain(target.Player);
