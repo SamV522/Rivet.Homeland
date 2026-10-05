@@ -342,6 +342,28 @@ internal sealed class HomelandSimulation
         Civilians.CallToArms(district,hla.Identity.Id,position.X,position.Z);
     }
 
+    public void OrderFollow(PlayerLife hla,Vec3 position)
+    {
+        if(hla.Faction!=Faction.Hla||hla.State!=LifeState.Active)return;
+        var district=position.X<-20?District.Village:position.X>20?District.Cbd:District.Bazaar;
+        Civilians.OrderFollow(district,hla.Identity.Id);
+    }
+
+    public void OrderGoHere(PlayerLife hla,Vec3 position,Vec3 aim)
+    {
+        if(hla.Faction!=Faction.Hla||hla.State!=LifeState.Active)return;
+        var district=position.X<-20?District.Village:position.X>20?District.Cbd:District.Bazaar;
+        var target=position+aim.Normalized*10;
+        Civilians.OrderGoHere(district,new Vec3Like(target.X,target.Z));
+    }
+
+    public void OrderAttack(PlayerLife hla,Vec3 position)
+    {
+        if(hla.Faction!=Faction.Hla||hla.State!=LifeState.Active)return;
+        var district=position.X<-20?District.Village:position.X>20?District.Cbd:District.Bazaar;
+        Civilians.OrderAttack(district);
+    }
+
     public void Scramble(PlayerLife hla,Vec3 position)
     {
         if(hla.Faction!=Faction.Hla)return;
