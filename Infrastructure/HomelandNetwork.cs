@@ -96,10 +96,11 @@ internal sealed record HomelandSync(
     string? Winner,
     PlayerSummary[] Players,
     CivilianSummary[] Civilians,
+    CorpseSummary[] Corpses,
     IntelSummary[] Intel,
     ScheduleSummary? Schedule)
 {
-    public static HomelandSync Empty=>new(0,0,0,true,true,true,false,"Connecting...",null,[],[],[],null);
+    public static HomelandSync Empty=>new(0,0,0,true,true,true,false,"Connecting...",null,[],[],[],[],null);
 }
 
 internal sealed record PlayerSummary(
@@ -119,5 +120,6 @@ internal sealed record CivilianSummary(
     int Id,string Name,string District,string Activity,bool Rebel,bool CalledToArms,bool Armed,string Outfit,
     float X,float Y,float Z);
 
+internal sealed record CorpseSummary(int IdentityId,string Name,string Faction,string Outfit,float X,float Y,float Z);
 internal sealed record IntelSummary(int Id,string Kind,string Reference,string Summary,bool Verified);
 internal sealed record ScheduleSummary(int Id,string Kind,string District,int Seconds,string Assigned,string Reward);
