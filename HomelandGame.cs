@@ -141,6 +141,7 @@ internal sealed class HomelandGame:IGameLoop,IDisposable
         if(_engine.Input.Down(Key.C))buttons|=HomelandButtons.Cuff;
         if(_engine.Input.Down(Key.X))buttons|=HomelandButtons.Release;
         if(_engine.Input.Down(Key.K))buttons|=HomelandButtons.AbandonLife;
+        if(_engine.Input.Down(Key.P))buttons|=HomelandButtons.CycleSpawn;
         return new(move.X,move.Z,aim.X,aim.Z,buttons);
     }
 
@@ -163,7 +164,7 @@ internal sealed class HomelandGame:IGameLoop,IDisposable
             var pos=runtime?.Position??Vec3.Zero;
             return new PlayerSummary(
                 p.Slot,p.PeerId,p.Identity.Id,$"{p.Identity.First} {p.Identity.Last}",p.Faction.ToString(),p.State.ToString(),
-                p.PresentedAppearance.Outfit,p.PresentedAppearance.Masked,p.EquipmentSummary,pos.X,pos.Y,pos.Z);
+                p.PresentedAppearance.Outfit,p.PresentedAppearance.Masked,p.EquipmentSummary,p.PreferredCisfSpawn.ToString(),pos.X,pos.Y,pos.Z);
         }).ToArray();
 
         var civilians=(_civilianAgents?.Capture()??[]).Select(c=>new CivilianSummary(
@@ -173,7 +174,9 @@ internal sealed class HomelandGame:IGameLoop,IDisposable
             c.Position.X,c.Position.Y,c.Position.Z)).ToArray();
 
         return new(
-            s.MatchRemaining,s.CisfTickets,s.Civilians.AvailableHlaTickets,s.InsurrectionActive,s.Objective,s.Winner,
+            s.MatchRemaining,s.CisfTickets,s.Civilians.AvailableHlaTickets,
+            s.FobCommsOnline,s.VillagePoliceOnline,s.BazaarPoliceOnline,
+            s.InsurrectionActive,s.Objective,s.Winner,
             players,civilians,
             s.Schedules.Active is { } q
                 ?new(q.Id,q.Kind.ToString(),q.District.ToString(),(int)Math.Ceiling(q.RemainingSeconds),q.AssignedFaction.ToString(),q.Reward)
