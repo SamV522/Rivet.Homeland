@@ -51,7 +51,13 @@ internal sealed class CivilianAgentSystem : IDisposable
                 .SetTint(new Vec3(.72f,.65f,.52f));
 
             var model=HomelandAssets.Civilian(c.Identity.Appearance.Outfit);
-            if(model is not null)entity.SetModel(model);else entity.AddTag("DebugVisible");
+            if(model is not null)
+            {
+                entity.CreateChild($"Civilian {c.Identity.Id} visual")
+                    .SetLocalTransform(new Transform(Vec3.Zero,Vec3.Zero,HomelandAssets.HumanVisualScale(model)))
+                    .SetModel(model);
+            }
+            else entity.AddTag("DebugVisible");
 
             var agent=entity.AddComponent<NavigationAgent>(a=>
             {
