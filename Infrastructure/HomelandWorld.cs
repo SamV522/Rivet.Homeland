@@ -280,15 +280,19 @@ internal sealed class HomelandWorld : IDisposable
         }
 
         var p=SchedulePosition(kind,district);
-        if(_scheduleMarker is not { } marker || !marker.IsAlive)
+        Entity marker;
+        if(_scheduleMarker is not { } existing || !existing.IsAlive)
         {
-            _scheduleMarker=_world.Spawn("Schedule objective marker")
+            marker=_world.Spawn("Schedule objective marker")
                 .SetBounds(new Vec3(.45f,.08f,.45f),Vec3.Zero)
                 .SetTint(new Vec3(.95f,.62f,.18f))
                 .AddTag("DebugVisible");
-            _entities.Add(_scheduleMarker);
+            _scheduleMarker=marker;
+            _entities.Add(marker);
         }
-        _scheduleMarker
+        else marker=existing;
+
+        marker
             .SetTransform(new Transform(p+new Vec3(0,.10f,0),Vec3.Zero,One()))
             .SetVisible(true);
         _scheduleMarkerId=schedule.Id;
