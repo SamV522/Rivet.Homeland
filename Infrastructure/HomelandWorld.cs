@@ -26,6 +26,7 @@ internal sealed class HomelandWorld : IDisposable
 
     public NavigationSpace Navigation { get; private set; } = null!;
     public Vec3 FobSpawn => new(58, .05f, -17);
+    public Vec3 FobCommunications => new(70, .05f, -27);
     public Vec3 VillagePoliceSpawn => new(-58, .05f, 18);
     public Vec3 BazaarPoliceSpawn => new(14, .05f, 19);
 
@@ -140,7 +141,12 @@ internal sealed class HomelandWorld : IDisposable
 
     private IReadOnlyList<NavigationModifier> NavigationModifiers()
     {
-        var result = new List<NavigationModifier>();
+        var result = new List<NavigationModifier>
+        {
+            new() { Minimum = new(-78, -1, -3.2f), Maximum = new(78, 1, 3.2f), Area = 2 },
+            new() { Minimum = new(-78, -1, 15.7f), Maximum = new(78, 1, 20.3f), Area = 2 }
+        };
+        // Exclusions come last so no lower-cost road modifier can reopen a building footprint.
         foreach (var b in _buildings)
             result.Add(new NavigationModifier
             {
@@ -148,14 +154,6 @@ internal sealed class HomelandWorld : IDisposable
                 Maximum = b.Center + new Vec3(b.Half.X + .25f, b.Half.Y + 1, b.Half.Z + .25f),
                 Excluded = true
             });
-        result.Add(new NavigationModifier
-        {
-            Minimum = new(-78, -1, -3.2f), Maximum = new(78, 1, 3.2f), Area = 2
-        });
-        result.Add(new NavigationModifier
-        {
-            Minimum = new(-78, -1, 15.7f), Maximum = new(78, 1, 20.3f), Area = 2
-        });
         return result;
     }
 
@@ -227,6 +225,28 @@ internal sealed class HomelandWorld : IDisposable
             District.Bazaar => Project(new Vec3(0, 0, 7)),
             _ => Project(new Vec3(43, 0, 7))
         };
+
+    public Vec3 SchedulePosition(ScheduleState schedule)
+    {
+        var basePoint=schedule.District switch
+        {
+            District.Village=>new Vec3(-43,0,7),
+            District.Bazaar=>new Vec3(0,0,7),
+            _=>new Vec3(43,0,7)
+        };
+        var offset=schedule.Kind switch
+        {
+            ScheduleKind.MedicalConvoy=>new Vec3(0,0,8),
+            ScheduleKind.SupplyConvoy=>new Vec3(4,0,-6),
+            ScheduleKind.Checkpoint=>new Vec3(-4,0,0),
+            ScheduleKind.Patrol=>new Vec3(6,0,3),
+            ScheduleKind.RadioBriefing=>new Vec3(-6,0,6),
+            ScheduleKind.ReinforcementTruck=>new Vec3(8,0,-8),
+            ScheduleKind.HvtTransfer=>new Vec3(-8,0,-7),
+            _=>Vec3.Zero
+        };
+        return Project(basePoint+offset);
+    }
 
     public Vec3 CisfSpawn(CisfSpawnPoint spawn) => spawn switch
     {
