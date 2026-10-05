@@ -69,7 +69,7 @@ internal sealed class HomelandSimulation
         return new()
         {
             Slot=slot,PeerId=peer,Faction=Faction.Hla,Identity=c.Identity,PresentedAppearance=c.Identity.Appearance,
-            EquipmentSummary="Civilian clothes"
+            EquipmentSummary="Civilian clothes, concealed pistol"
         };
     }
 
