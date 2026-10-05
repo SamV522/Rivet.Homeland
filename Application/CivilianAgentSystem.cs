@@ -64,7 +64,7 @@ internal sealed class CivilianAgentSystem : IDisposable
         }
     }
 
-    public void FixedUpdate(float dt)
+    public void FixedUpdate(float dt,IReadOnlyDictionary<int,Vec3>? playerPositions=null)
     {
         _clock+=dt;
         foreach(var runtime in _agents.Values)
@@ -86,10 +86,22 @@ internal sealed class CivilianAgentSystem : IDisposable
 
             runtime.Entity.SetVisible(true);
             c.District=_scene.DistrictAt(runtime.Entity.Transform.Position);
+            if(c.FollowIdentityId is { } leader&&playerPositions is not null&&playerPositions.TryGetValue(leader,out var leaderPosition))
+            {
+                c.RallyX=leaderPosition.X;
+                c.RallyZ=leaderPosition.Z;
+            }
 
             if(c.Incarcerated)
             {
                 runtime.Agent.Stop();
+                runtime.ActiveAction=null;
+                runtime.Plan=[];
+                continue;
+            }
+
+            if(c.AttackOrdered&&c.CalledToArms&&c.Armed)
+            {
                 runtime.ActiveAction=null;
                 runtime.Plan=[];
                 continue;
@@ -226,7 +238,60 @@ internal sealed class CivilianAgentSystem : IDisposable
         }
     }
 
+    public void UpdateRebelCombat(float dt,IReadOnlyList<PlayerCombatTarget> targets,HomelandSimulation simulation)
+    {
+        foreach(var runtime in _agents.Values)
+        {
+            var c=runtime.State;
+            runtime.CombatCooldown=Math.Max(0,runtime.CombatCooldown-dt);
+            runtime.CombatRepath=Math.Max(0,runtime.CombatRepath-dt);
+            if(c.Health<=0||c.PlayerControlled||c.Incarcerated||!c.Rebel||!c.CalledToArms||!c.Armed||!c.AttackOrdered)continue;
+
+            var target=targets
+                .Where(t=>t.Life.Faction==Faction.Cisf&&t.Life.State==LifeState.Active)
+                .OrderBy(t=>Horizontal(t.Position-runtime.Entity.Transform.Position))
+                .FirstOrDefault();
+            if(target is null)continue;
+
+            var delta=target.Position-runtime.Entity.Transform.Position;
+            var distance=Horizontal(delta);
+            if(distance>18)continue;
+
+            if(distance>7.5f)
+            {
+                if(runtime.CombatRepath<=0)
+                {
+                    runtime.Agent.SetDestination(_scene.Project(target.Position));
+                    runtime.CombatRepath=.55f+(c.Identity.Id%5)*.08f;
+                }
+                c.CurrentActivity="Advancing on CISF";
+                continue;
+            }
+
+            runtime.Agent.Stop();
+            c.CurrentActivity="Engaging CISF";
+            if(runtime.CombatCooldown>0||!ClearShot(runtime.Entity,target.Entity))continue;
+
+            // Recruited civilians are intentionally shaky and individually weak.
+            var damage=8f+(c.Identity.Id%5);
+            simulation.DamagePlayer(target.Life,damage);
+            runtime.CombatCooldown=.85f+(c.Identity.Id%7)*.11f;
+        }
+    }
+
+    private bool ClearShot(Entity shooter,Entity target)
+    {
+        var from=shooter.Transform.Position+new Vec3(0,1f,0);
+        var to=target.Transform.Position+new Vec3(0,1f,0);
+        var delta=to-from;
+        if(delta.Length<.05f)return true;
+        var direction=delta.Normalized;
+        var hit=_world.Raycast(from+direction*.45f,direction,Math.Max(0,delta.Length-.45f));
+        return hit is null||hit.Value.Entity==target;
+    }
+
     public Vec3 Position(int identityId)=>_agents.TryGetValue(identityId,out var r)?r.Entity.Transform.Position:Vec3.Zero;
+    public Entity? EntityFor(int identityId)=>_agents.TryGetValue(identityId,out var r)?r.Entity:null;
 
     public void SetPlayerControlled(int identityId,bool controlled)
     {
@@ -296,6 +361,8 @@ internal sealed class CivilianAgentSystem : IDisposable
         public float ReplanRemaining { get; set; }
         public GoapAction? ActiveAction { get; set; }
         public IReadOnlyList<GoapAction> Plan { get; set; }=[];
+        public float CombatCooldown { get; set; }
+        public float CombatRepath { get; set; }
     }
 
     private static bool Arrived(Runtime r)=>r.Agent.Destination is not null&&r.Agent.RemainingDistance<=r.Agent.StoppingDistance+.2f;
