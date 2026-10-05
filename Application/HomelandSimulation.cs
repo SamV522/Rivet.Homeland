@@ -12,6 +12,10 @@ internal sealed class HomelandSimulation
     public List<PlayerLife> Players { get; }=[];
     public List<RadioMessage> RadioLog { get; }=[];
     public int CisfTickets { get; private set; }=HomelandRules.StartingCisfTickets;
+    public bool FobCommsOnline { get; private set; }=true;
+    public bool VillagePoliceOnline { get; private set; }=true;
+    public bool BazaarPoliceOnline { get; private set; }=true;
+    public bool AnyCisfSpawnAvailable=>FobCommsOnline||VillagePoliceOnline||BazaarPoliceOnline;
     public float MatchRemaining { get; private set; }
     public bool InsurrectionActive { get; private set; }
     public string Objective { get; private set; }="Maintain order / build intelligence";
@@ -227,7 +231,10 @@ internal sealed class HomelandSimulation
     {
         if(p.Faction==Faction.Cisf)
         {
-            if(CisfTickets<=0)return;
+            if(CisfTickets<=0||!AnyCisfSpawnAvailable)return;
+            var resolved=ResolveCisfSpawn(p);
+            if(resolved is null)return;
+            p.PreferredCisfSpawn=resolved.Value;
             var fresh=_ids.Create(_nextCisf++);
             p.Identity=fresh;
             p.PresentedAppearance=fresh.Appearance;
@@ -261,6 +268,72 @@ internal sealed class HomelandSimulation
 
     public bool Recruit(PlayerLife hla,int civilianId,bool threaten=false,bool pay=false)=>
         hla.Faction==Faction.Hla&&hla.State==LifeState.Active&&Civilians.Recruit(civilianId,hla.Identity.Id,threaten,pay);
+
+    public CisfSpawnPoint? ResolveCisfSpawn(PlayerLife player)
+    {
+        if(player.Faction!=Faction.Cisf)return null;
+        if(player.PreferredCisfSpawn==CisfSpawnPoint.Fob&&FobCommsOnline)return CisfSpawnPoint.Fob;
+        if(player.PreferredCisfSpawn==CisfSpawnPoint.VillagePolice&&VillagePoliceOnline)return CisfSpawnPoint.VillagePolice;
+        if(player.PreferredCisfSpawn==CisfSpawnPoint.BazaarPolice&&BazaarPoliceOnline)return CisfSpawnPoint.BazaarPolice;
+        if(FobCommsOnline)return CisfSpawnPoint.Fob;
+        if(VillagePoliceOnline)return CisfSpawnPoint.VillagePolice;
+        if(BazaarPoliceOnline)return CisfSpawnPoint.BazaarPolice;
+        return null;
+    }
+
+    public void CycleCisfSpawn(PlayerLife player)
+    {
+        if(player.Faction!=Faction.Cisf)return;
+        var choices=new[]{CisfSpawnPoint.Fob,CisfSpawnPoint.VillagePolice,CisfSpawnPoint.BazaarPolice}
+            .Where(s=>s switch
+            {
+                CisfSpawnPoint.Fob=>FobCommsOnline,
+                CisfSpawnPoint.VillagePolice=>VillagePoliceOnline,
+                CisfSpawnPoint.BazaarPolice=>BazaarPoliceOnline,
+                _=>false
+            }).ToArray();
+        if(choices.Length==0)return;
+        var index=Array.IndexOf(choices,player.PreferredCisfSpawn);
+        player.PreferredCisfSpawn=choices[(index+1+choices.Length)%choices.Length];
+    }
+
+    public void SabotageFobComms()
+    {
+        if(!FobCommsOnline)return;
+        FobCommsOnline=false;
+        Objective=InsurrectionActive?"SURVIVE THE INSURRECTION":"FOB communications destroyed / operate from police stations";
+    }
+
+    public void SetPoliceStation(District district,bool cisfControlled)
+    {
+        if(district==District.Village)VillagePoliceOnline=cisfControlled;
+        else if(district==District.Bazaar)BazaarPoliceOnline=cisfControlled;
+    }
+
+    public bool ResolveSchedule(Faction winner)
+    {
+        var schedule=Schedules.Active;
+        if(schedule is null||schedule.Complete||schedule.Failed||winner==Faction.Civilian)return false;
+        Schedules.Resolve(winner);
+        if(winner==Faction.Cisf)
+        {
+            if(schedule.Kind==ScheduleKind.ReinforcementTruck)CisfTickets+=3;
+            foreach(var c in Civilians.Civilians.Where(c=>c.District==schedule.District))
+            {
+                c.CisfAlignment=Math.Clamp(c.CisfAlignment+.035f,0,1);
+                c.Anger=Math.Clamp(c.Anger-.02f,0,1);
+            }
+        }
+        else
+        {
+            foreach(var c in Civilians.Civilians.Where(c=>c.District==schedule.District))
+            {
+                c.HlaAlignment=Math.Clamp(c.HlaAlignment+.045f,0,1);
+                c.Anger=Math.Clamp(c.Anger+.03f,0,1);
+            }
+        }
+        return true;
+    }
 
     public void CallToArms(PlayerLife hla,Vec3 position)
     {
