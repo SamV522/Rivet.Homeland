@@ -25,4 +25,21 @@ jobs:
           dotnet-version: 10.0.x
 
       - name: Build Homeland
-        run: dotnet build Rivet.Homeland/Rivet.Homeland.csproj -c Release -p:RivetRoot="$GITHUB_WORKSPACE/Rivet"
+        id: build
+        shell: bash
+        run: |
+          set +e
+          dotnet build Rivet.Homeland/Rivet.Homeland.csproj -c Release -p:RivetRoot="$GITHUB_WORKSPACE/Rivet" 2>&1 | tee homeland-build.log
+          code=${PIPESTATUS[0]}
+          echo "exit_code=$code" >> "$GITHUB_OUTPUT"
+          exit 0
+
+      - name: Upload build log
+        uses: actions/upload-artifact@v4
+        with:
+          name: homeland-build-log
+          path: homeland-build.log
+
+      - name: Fail if build failed
+        if: steps.build.outputs.exit_code != '0'
+        run: exit 1
