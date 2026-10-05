@@ -1,0 +1,25 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RivetRoot Condition="'$(RivetRoot)' == ''">$([System.IO.Path]::GetFullPath('$(MSBuildThisFileDirectory)..\Rivet'))</RivetRoot>
+    <RivetNativeDll Condition="'$(RivetNativeDll)' == '' and Exists('$(RivetRoot)\build\native\Rivet.CApi\rivet.dll')">$(RivetRoot)\build\native\Rivet.CApi\rivet.dll</RivetNativeDll>
+    <SteamNativeDll Condition="'$(SteamNativeDll)' == ''">$(RivetRoot)/build/steamworks/win-x64/steam_api64.dll</SteamNativeDll>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="$(RivetRoot)/managed/Rivet.CSharp/Rivet.CSharp.csproj" />
+    <ProjectReference Include="$(RivetRoot)/managed/Rivet.Networking/Rivet.Networking.csproj" />
+    <ProjectReference Include="$(RivetRoot)/managed/Rivet.Networking.Steam/Rivet.Networking.Steam.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <Content Include="assets/**/*" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+  </ItemGroup>
+  <ItemGroup Condition="'$(RivetNativeDll)' != '' and Exists('$(RivetNativeDll)')">
+    <None Include="$(RivetNativeDll)" Link="rivet.dll" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+  </ItemGroup>
+  <ItemGroup Condition="Exists('$(SteamNativeDll)')">
+    <None Include="$(SteamNativeDll)" Link="steam_api64.dll" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+  </ItemGroup>
+</Project>
