@@ -81,6 +81,7 @@ internal sealed class PlayerActorSystem : IDisposable
             if((pressed&HomelandButtons.Cuff)!=0)Cuff(runtime);
             if((pressed&HomelandButtons.Release)!=0)Release(runtime);
             if((pressed&HomelandButtons.AbandonLife)!=0)_simulation.AbandonDetainedLife(player);
+            if((pressed&HomelandButtons.CycleSpawn)!=0)_simulation.CycleCisfSpawn(player);
             if((input.Buttons&HomelandButtons.Fire)!=0&&runtime.FireCooldown<=0)Fire(runtime);
         }
     }
@@ -106,7 +107,11 @@ internal sealed class PlayerActorSystem : IDisposable
 
     private Vec3 SpawnPosition(PlayerLife player)
     {
-        if(player.Faction==Faction.Cisf)return _scene.CisfSpawn(player.PreferredCisfSpawn);
+        if(player.Faction==Faction.Cisf)
+        {
+            var spawn=_simulation.ResolveCisfSpawn(player)??player.PreferredCisfSpawn;
+            return _scene.CisfSpawn(spawn);
+        }
         var position=_civilians.Position(player.Identity.Id);
         return position.LengthSquared>.01f?position:_scene.BazaarPosition(_simulation.Civilians.ById(player.Identity.Id)!);
     }
@@ -114,6 +119,34 @@ internal sealed class PlayerActorSystem : IDisposable
     private void Interact(Runtime actor)
     {
         var player=actor.Player;
+        var position=actor.Entity.Transform.Position;
+
+        if(_simulation.Schedules.Active is {Complete:false,Failed:false} schedule
+           &&Flat(_scene.SchedulePosition(schedule)-position).Length<3.5f)
+        {
+            _simulation.ResolveSchedule(player.Faction);
+            return;
+        }
+
+        if(player.Faction==Faction.Hla&&_simulation.FobCommsOnline
+           &&Flat(_scene.FobCommunications-position).Length<3.5f)
+        {
+            _simulation.SabotageFobComms();
+            return;
+        }
+
+        if(Flat(_scene.VillagePoliceSpawn-position).Length<4)
+        {
+            _simulation.SetPoliceStation(District.Village,player.Faction==Faction.Cisf);
+            return;
+        }
+
+        if(Flat(_scene.BazaarPoliceSpawn-position).Length<4)
+        {
+            _simulation.SetPoliceStation(District.Bazaar,player.Faction==Faction.Cisf);
+            return;
+        }
+
         var nearbyDowned=NearestPlayer(actor,2.2f,p=>p.State==LifeState.Downed);
         if(nearbyDowned is not null)
         {
@@ -169,7 +202,7 @@ internal sealed class PlayerActorSystem : IDisposable
 
     private void Fire(Runtime shooter)
     {
-        shooter.FireCooldown=shooter.Player.Faction==Faction.Cisf?.14f:.28f;
+        shooter.FireCooldown=shooter.Player.Faction==Faction.Cisf ? .14f : .28f;
         var origin=shooter.Entity.Transform.Position;
         var aim=shooter.Aim;
 
@@ -195,10 +228,10 @@ internal sealed class PlayerActorSystem : IDisposable
             if(distance<bestDistance){bestDistance=distance;bestCivilian=new(c,p);bestPlayer=null;}
         }
 
-        if(bestPlayer is not null)_simulation.DamagePlayer(bestPlayer.Player,shooter.Player.Faction==Faction.Cisf?42:38);
+        if(bestPlayer is not null)_simulation.DamagePlayer(bestPlayer.Player,shooter.Player.Faction==Faction.Cisf ? 42 : 38);
         else if(bestCivilian is not null)
         {
-            _simulation.DamageCivilian(bestCivilian.State.Identity.Id,shooter.Player.Faction==Faction.Cisf?42:38,shooter.Player.Faction);
+            _simulation.DamageCivilian(bestCivilian.State.Identity.Id,shooter.Player.Faction==Faction.Cisf ? 42 : 38,shooter.Player.Faction);
             if(bestCivilian.State.Health<=0)_civilians.KillIdentity(bestCivilian.State.Identity.Id);
         }
 
