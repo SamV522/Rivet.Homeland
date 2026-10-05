@@ -44,6 +44,7 @@ internal sealed class CivilianState
     public bool CalledToArms { get; set; }
     public bool ScrambleRequested { get; set; }
     public int? FollowIdentityId { get; set; }
+    public bool AttackOrdered { get; set; }
     public float RallyX { get; set; }
     public float RallyZ { get; set; }
     public string CurrentActivity { get; set; } = "Going about their day";
