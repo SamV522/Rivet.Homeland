@@ -9,14 +9,15 @@ internal sealed class CivilianAgentSystem : IDisposable
     private readonly World _world;
     private readonly HomelandWorld _scene;
     private readonly CivilianDirector _director;
+    private readonly Forensics _forensics;
     private readonly Dictionary<int,Runtime> _agents=[];
     private readonly IReadOnlyList<GoapAction> _actions;
     private float _clock;
     private bool _disposed;
 
-    public CivilianAgentSystem(World world,HomelandWorld scene,CivilianDirector director)
+    public CivilianAgentSystem(World world,HomelandWorld scene,HomelandSimulation simulation)
     {
-        _world=world;_scene=scene;_director=director;
+        _world=world;_scene=scene;_director=simulation.Civilians;_forensics=simulation.Forensics;
         _actions=
         [
             new("Flee to safety",CivilianFact.InDanger,CivilianFact.AtSafePlace,CivilianFact.AtSafePlace,
@@ -210,7 +211,11 @@ internal sealed class CivilianAgentSystem : IDisposable
         switch(action.Name)
         {
             case "Report what I saw":
-                _director.MarkWitnessesReported(c);
+                foreach(var memory in c.Memories.Where(m=>!m.Reported).ToArray())
+                {
+                    _forensics.Log(_forensics.WitnessStatement(c.Identity.Id,memory));
+                    memory.Reported=true;
+                }
                 c.CurrentActivity="Reported what they witnessed to CISF";
                 break;
             case "Retrieve hidden weapon":
