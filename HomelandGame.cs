@@ -78,6 +78,9 @@ internal sealed class HomelandGame:IGameLoop,IDisposable
                 _civilianAgents!.FixedUpdate(dt,_playerActors.IdentityPositions());
                 _civilianAgents.UpdateRebelCombat(dt,_playerActors.CombatTargets(),_sim!);
                 _sim!.Update(dt);
+                _scene.UpdateScheduleMarker(_sim.Schedules.Active is { } q
+                    ? new ScheduleSummary(q.Id,q.Kind.ToString(),q.District.ToString(),(int)Math.Ceiling(q.RemainingSeconds),q.AssignedFaction.ToString(),q.Reward)
+                    : null);
                 _syncRemaining-=dt;
                 if(_syncRemaining<=0)Broadcast();
             }
@@ -89,6 +92,7 @@ internal sealed class HomelandGame:IGameLoop,IDisposable
             {
                 _network.SendInput(_world.SimulationTick,ReadInput());
                 _scene.ApplyRemoteState(_network.Remote);
+                _scene.UpdateScheduleMarker(_network.Remote.Schedule);
             }
         }
     }
