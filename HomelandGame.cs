@@ -13,7 +13,8 @@ internal sealed class HomelandGame:IGameLoop,IDisposable
     private readonly HomelandLaunchOptions _options;
     private readonly HomelandNetwork _network;
     private readonly HomelandWorld _scene;
-    private readonly HomelandSimulation? _sim;
+    private readonly HomelandSettings _settings;
+    private HomelandSimulation? _sim;
     private readonly LobbyMenu? _lobby;
     private readonly Hud? _hud;
     private CivilianAgentSystem? _civilianAgents;
@@ -28,7 +29,7 @@ internal sealed class HomelandGame:IGameLoop,IDisposable
         _engine=engine;_world=world;_options=options;
         _network=new(options);
         _scene=new(world);
-        if(options.IsHost)_sim=new(settings);
+        _settings=settings;
         if(!options.Dedicated)
         {
             _lobby=new(engine,settings,StartMatch);
@@ -39,11 +40,6 @@ internal sealed class HomelandGame:IGameLoop,IDisposable
     public void Start()
     {
         _scene.Build();
-        if(_sim is not null)
-        {
-            _civilianAgents=new CivilianAgentSystem(_world,_scene,_sim.Civilians);
-            _civilianAgents.SpawnAll();
-        }
         if(!_options.Dedicated)
         {
             _engine.SetMouseMode(MouseMode.Free);
@@ -54,9 +50,12 @@ internal sealed class HomelandGame:IGameLoop,IDisposable
 
     private void StartMatch()
     {
-        if(!_options.IsHost)return;
-        _sim!.StartRoster(_network.PeerIds,_options.Dedicated);
-        _playerActors??=new PlayerActorSystem(_world,_scene,_sim,_civilianAgents!);
+        if(!_options.IsHost||_started)return;
+        _sim=new HomelandSimulation(_settings);
+        _civilianAgents=new CivilianAgentSystem(_world,_scene,_sim.Civilians);
+        _civilianAgents.SpawnAll();
+        _sim.StartRoster(_network.PeerIds,_options.Dedicated);
+        _playerActors=new PlayerActorSystem(_world,_scene,_sim,_civilianAgents);
         _playerActors.SpawnAll();
         _started=true;
         if(!_options.Dedicated)_engine.SetMouseMode(MouseMode.Free);
@@ -105,13 +104,17 @@ internal sealed class HomelandGame:IGameLoop,IDisposable
     public void DrawUi()
     {
         if(_options.Dedicated)return;
-        var sync=_network.IsHost?Sync():_network.Remote;
-        if(!_started&&(_network.IsHost||sync.Players.Length==0))
+        if(!_started)
         {
-            _lobby?.Draw(Math.Max(1,_network.PeerCount+1),_options.IsHost);
-            return;
+            if(!_network.IsHost&&_network.Remote.Players.Length>0)_started=true;
+            else
+            {
+                _lobby?.Draw(Math.Max(1,_network.PeerCount+1),_options.IsHost);
+                return;
+            }
         }
 
+        var sync=_network.IsHost?Sync():_network.Remote;
         var local=LocalSummary(sync);
         _hud?.Draw(sync,local);
     }
