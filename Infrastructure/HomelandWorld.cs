@@ -409,17 +409,26 @@ internal sealed class HomelandWorld : IDisposable
                 corpse.SetInteraction($"Inspect {s.Name}","homeland.corpse");
                 _remoteCorpses.Add(s.IdentityId,corpse);
             }
-            corpse.SetTransform(new Transform(new Vec3(s.X,s.Y,s.Z),new Vec3(0,0,90),One()));
+            corpse.SetTransform(new Transform(new Vec3(s.X,s.Y,s.Z),Vec3.Zero,One()));
         }
     }
 
-    private Entity SpawnRemoteHuman(string name, string? model, Vec3 tint)
+    private Entity SpawnRemoteHuman(string name,string? model,Vec3 tint)
     {
-        var e = _world.Spawn(name).SetTint(tint);
-        if (model is not null) e.SetModel(model);
-        else e.SetBounds(new Vec3(.30f, .875f, .30f), new Vec3(0, .875f, 0)).AddTag("DebugVisible");
-        _entities.Add(e);
-        return e;
+        var root=_world.Spawn(name).SetTint(tint);
+        if(model is not null)
+        {
+            var visual=root.CreateChild(name+" visual")
+                .SetLocalTransform(new Transform(Vec3.Zero,Vec3.Zero,HomelandAssets.HumanVisualScale(model)))
+                .SetModel(model);
+            _entities.Add(visual);
+        }
+        else
+        {
+            root.SetBounds(new Vec3(.30f,.875f,.30f),new Vec3(0,.875f,0)).AddTag("DebugVisible");
+        }
+        _entities.Add(root);
+        return root;
     }
 
     private static Vec3 One() => new(1, 1, 1);
