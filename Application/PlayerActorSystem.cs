@@ -82,6 +82,9 @@ internal sealed class PlayerActorSystem : IDisposable
             if((pressed&HomelandButtons.Release)!=0)Release(runtime);
             if((pressed&HomelandButtons.AbandonLife)!=0)_simulation.AbandonDetainedLife(player);
             if((pressed&HomelandButtons.CycleSpawn)!=0)_simulation.CycleCisfSpawn(player);
+            if((pressed&HomelandButtons.Follow)!=0)_simulation.OrderFollow(player,runtime.Entity.Transform.Position);
+            if((pressed&HomelandButtons.GoHere)!=0)_simulation.OrderGoHere(player,runtime.Entity.Transform.Position,runtime.Aim);
+            if((pressed&HomelandButtons.Attack)!=0)_simulation.OrderAttack(player,runtime.Entity.Transform.Position);
             if((input.Buttons&HomelandButtons.Fire)!=0&&runtime.FireCooldown<=0)Fire(runtime);
         }
     }
@@ -125,6 +128,14 @@ internal sealed class PlayerActorSystem : IDisposable
            &&Flat(_scene.SchedulePosition(schedule)-position).Length<3.5f)
         {
             _simulation.ResolveSchedule(player.Faction);
+            return;
+        }
+
+        if(player.Faction==Faction.Hla&&_simulation.Civilians.ById(player.Identity.Id) is { } controlled
+           &&Flat(_scene.WeaponCachePosition(controlled)-position).Length<3.2f)
+        {
+            controlled.Armed=true;
+            player.EquipmentSummary="Civilian clothes, concealed pistol";
             return;
         }
 
@@ -202,6 +213,10 @@ internal sealed class PlayerActorSystem : IDisposable
 
     private void Fire(Runtime shooter)
     {
+        if(shooter.Player.Faction==Faction.Hla
+           &&!shooter.Player.EquipmentSummary.Contains("pistol",StringComparison.OrdinalIgnoreCase)
+           &&!shooter.Player.EquipmentSummary.Contains("weapon",StringComparison.OrdinalIgnoreCase))
+            return;
         shooter.FireCooldown=shooter.Player.Faction==Faction.Cisf ? .14f : .28f;
         var origin=shooter.Entity.Transform.Position;
         var aim=shooter.Aim;
@@ -226,7 +241,7 @@ internal sealed class PlayerActorSystem : IDisposable
             var delta=Flat(p-origin);
             var distance=delta.Length;if(distance<.1f||distance>35)continue;
             if(Dot(delta.Normalized,aim)<.965f)continue;
-            if(!ClearShot(origin,p,null))continue;
+            if(!ClearShot(origin,p,_civilians.EntityFor(c.Identity.Id)))continue;
             if(distance<bestDistance){bestDistance=distance;bestCivilian=new(c,p);bestPlayer=null;}
         }
 
@@ -255,7 +270,8 @@ internal sealed class PlayerActorSystem : IDisposable
         var delta=to-from;
         var distance=delta.Length;
         if(distance<.01f)return true;
-        var hit=_world.Raycast(from,delta.Normalized,distance);
+        var direction=delta.Normalized;
+        var hit=_world.Raycast(from+direction*.45f,direction,Math.Max(0,distance-.45f));
         return hit is null||targetEntity is not null&&hit.Value.Entity==targetEntity;
     }
 
@@ -283,6 +299,9 @@ internal sealed class PlayerActorSystem : IDisposable
         }
         return best;
     }
+
+    public IReadOnlyDictionary<int,Vec3> IdentityPositions()=>_actors.Values.ToDictionary(r=>r.Player.Identity.Id,r=>r.Entity.Transform.Position);
+    public PlayerCombatTarget[] CombatTargets()=>_actors.Values.Select(r=>new PlayerCombatTarget(r.Player,r.Entity,r.Entity.Transform.Position)).ToArray();
 
     public Vec3 Position(int slot)=>_actors.TryGetValue(slot,out var r)?r.Entity.Transform.Position:Vec3.Zero;
     public Vec3 Aim(int slot)=>_actors.TryGetValue(slot,out var r)?r.Aim:new Vec3(0,0,1);
@@ -318,3 +337,6 @@ internal sealed class PlayerActorSystem : IDisposable
 }
 
 internal sealed record PlayerRuntimeSummary(int Slot,uint? PeerId,int IdentityId,Vec3 Position,Vec3 Aim);
+
+
+internal sealed record PlayerCombatTarget(PlayerLife Life,Entity Entity,Vec3 Position);
