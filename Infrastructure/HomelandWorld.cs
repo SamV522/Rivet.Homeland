@@ -10,6 +10,8 @@ internal sealed class HomelandWorld : IDisposable
     private readonly Dictionary<int, Entity> _remoteCivilians = [];
     private readonly Dictionary<int, Entity> _remotePlayers = [];
     private readonly List<BuildingSpec> _buildings = [];
+    private Entity? _scheduleMarker;
+    private int _scheduleMarkerId;
     private bool _built;
 
     public NavigationProfile HumanNavigationProfile { get; } = new()
@@ -78,6 +80,7 @@ internal sealed class HomelandWorld : IDisposable
         SpawnVehicle("CISF reinforcement truck", new Vec3(54, .7f, -18), HomelandAssets.Truck());
         SpawnVehicle("Civilian car", new Vec3(-4, .55f, 8), HomelandAssets.Car());
         SpawnVehicle("Civilian car 2", new Vec3(25, .55f, 7), HomelandAssets.Car());
+        SpawnVehicle("Police vehicle", new Vec3(18, .55f, 24), HomelandAssets.PoliceVehicle());
     }
 
     private void AddBuilding(BuildingSpec spec)
@@ -85,8 +88,8 @@ internal sealed class HomelandWorld : IDisposable
         _buildings.Add(spec);
         string? model = spec.AssetToken switch
         {
-            "house" => HomelandAssets.House(),
-            _ => HomelandAssets.Building()
+            "house" => HomelandAssets.House(spec.Name),
+            _ => HomelandAssets.Building(spec.Name)
         };
         var e = AddSolid(spec.Name, spec.Center, spec.Half, spec.Tint, model);
         e.SetInteraction(spec.Name, "homeland.location");
@@ -103,9 +106,26 @@ internal sealed class HomelandWorld : IDisposable
 
     private void AddRoad(Vec3 p, Vec3 half)
     {
-        var e = _world.Spawn("Road").SetTransform(new Transform(p, Vec3.Zero, One()))
+        var e = _world.Spawn("Road base").SetTransform(new Transform(p, Vec3.Zero, One()))
             .SetBounds(half, Vec3.Zero).SetTint(new Vec3(.18f, .18f, .17f)).AddTag("DebugVisible");
         _entities.Add(e);
+
+        var model=HomelandAssets.RoadStraight();
+        if(model is null)return;
+
+        var alongX=half.X>=half.Z;
+        var halfLength=alongX?half.X:half.Z;
+        const float spacing=4f;
+        var count=Math.Max(1,(int)MathF.Floor(halfLength*2/spacing));
+        for(var i=0;i<count;i++)
+        {
+            var offset=-halfLength+spacing*.5f+i*spacing;
+            var position=p+(alongX?new Vec3(offset,.02f,0):new Vec3(0,.02f,offset));
+            var visual=_world.Spawn("Kenney road tile")
+                .SetTransform(new Transform(position,new Vec3(0,alongX?90:0,0),One()))
+                .SetModel(model);
+            _entities.Add(visual);
+        }
     }
 
     private Entity AddSolid(string name, Vec3 p, Vec3 half, Vec3 tint, string? model = null)
@@ -226,15 +246,17 @@ internal sealed class HomelandWorld : IDisposable
             _ => Project(new Vec3(43, 0, 7))
         };
 
-    public Vec3 SchedulePosition(ScheduleState schedule)
+    public Vec3 SchedulePosition(ScheduleState schedule)=>SchedulePosition(schedule.Kind,schedule.District);
+
+    public Vec3 SchedulePosition(ScheduleKind kind,District district)
     {
-        var basePoint=schedule.District switch
+        var basePoint=district switch
         {
             District.Village=>new Vec3(-43,0,7),
             District.Bazaar=>new Vec3(0,0,7),
             _=>new Vec3(43,0,7)
         };
-        var offset=schedule.Kind switch
+        var offset=kind switch
         {
             ScheduleKind.MedicalConvoy=>new Vec3(0,0,8),
             ScheduleKind.SupplyConvoy=>new Vec3(4,0,-6),
@@ -246,6 +268,30 @@ internal sealed class HomelandWorld : IDisposable
             _=>Vec3.Zero
         };
         return Project(basePoint+offset);
+    }
+
+    public void UpdateScheduleMarker(ScheduleSummary? schedule)
+    {
+        if(schedule is null||!Enum.TryParse<ScheduleKind>(schedule.Kind,out var kind)||!Enum.TryParse<District>(schedule.District,out var district))
+        {
+            if(_scheduleMarker is { IsAlive:true } old)old.SetVisible(false);
+            _scheduleMarkerId=0;
+            return;
+        }
+
+        var p=SchedulePosition(kind,district);
+        if(_scheduleMarker is not { IsAlive:true })
+        {
+            _scheduleMarker=_world.Spawn("Schedule objective marker")
+                .SetBounds(new Vec3(.45f,.08f,.45f),Vec3.Zero)
+                .SetTint(new Vec3(.95f,.62f,.18f))
+                .AddTag("DebugVisible");
+            _entities.Add(_scheduleMarker.Value);
+        }
+        _scheduleMarker.Value
+            .SetTransform(new Transform(p+new Vec3(0,.10f,0),Vec3.Zero,One()))
+            .SetVisible(true);
+        _scheduleMarkerId=schedule.Id;
     }
 
     public Vec3 CisfSpawn(CisfSpawnPoint spawn) => spawn switch
