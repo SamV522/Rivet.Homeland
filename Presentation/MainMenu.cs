@@ -13,6 +13,7 @@ internal sealed class MainMenu(
 {
     private bool _friendsOpen;
     private bool _optionsOpen;
+    private bool _practiceOpen;
     private float _refresh;
     private SteamFriendSession[] _friends=[];
     private int _page;
@@ -35,6 +36,7 @@ internal sealed class MainMenu(
         if(engine.Input.Pressed(Key.Escape))
         {
             if(_optionsOpen)_optionsOpen=false;
+            else if(_practiceOpen)_practiceOpen=false;
             else if(_friendsOpen)_friendsOpen=false;
             else engine.RequestQuit();
         }
@@ -55,24 +57,42 @@ internal sealed class MainMenu(
         if(MenuWidgets.Button(engine,new(x,y+74,340,58),"JOIN STEAM FRIENDS")&&ensureSteam())
         {
             _friendsOpen=true;
+            _practiceOpen=false;
             _refresh=0;
         }
 
         if(MenuWidgets.Button(engine,new(x,y+148,340,58),"HOST LOCAL / LAN"))
             select(defaults with{IsHost=true,Dedicated=false,Transport=HomelandTransportKind.Udp,OpenMainMenu=false});
 
-        if(MenuWidgets.Button(engine,new(x,y+222,340,48),"OPTIONS"))
+        if(MenuWidgets.Button(engine,new(x,y+222,340,48),"PRACTICE"))
+        {
+            _practiceOpen=!_practiceOpen;
+            _friendsOpen=false;
+        }
+
+        if(MenuWidgets.Button(engine,new(x,y+286,340,48),"OPTIONS"))
         {
             _optionsOpen=true;
             _friendsOpen=false;
         }
 
-        if(MenuWidgets.Button(engine,new(x,y+286,340,48),"EXIT"))
+        if(MenuWidgets.Button(engine,new(x,y+350,340,48),"EXIT"))
             engine.RequestQuit();
 
         engine.Render2D.TextBox(
             "Liberation / 3 districts / physical civilian population / GOAP + Rivet Navigation / Steam P2P",
             48,v.Y-78,v.X-96,44,14,HomelandTheme.Muted);
+
+        if(_practiceOpen)
+        {
+            var px=v.X*.52f;
+            var pw=v.X-px-48;
+            engine.Render2D.Text("PRACTICE",px,188,24,HomelandTheme.Accent);
+            engine.Render2D.TextBox("Solo sandbox in the full town. Test movement, weapons, civilian interactions, and HLA recruitment/orders. Includes a stationary opposing target, unlimited respawns, and no match ending. Switch sides or reset at any time.",px,236,pw,150,16,HomelandTheme.Text);
+            void Play(Faction faction)=>select(defaults with{IsHost=true,Dedicated=false,Transport=HomelandTransportKind.Udp,PracticeFaction=faction,OpenMainMenu=false});
+            if(MenuWidgets.Button(engine,new(px,410,pw,54),"PRACTICE AS CISF",primary:true))Play(Faction.Cisf);
+            if(MenuWidgets.Button(engine,new(px,482,pw,54),"PRACTICE AS HLA",primary:true))Play(Faction.Hla);
+        }
 
         if(!_friendsOpen)return;
 

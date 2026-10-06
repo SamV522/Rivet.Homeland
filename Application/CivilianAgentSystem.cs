@@ -339,6 +339,15 @@ internal sealed class CivilianAgentSystem : IDisposable
         r.ControlledPosition=position;
     }
 
+    public void SetPaused(bool paused)
+    {
+        foreach(var agent in _agents.Values)
+        {
+            agent.Agent.Enabled=!paused;
+            if(paused)agent.Entity.GetComponent<CharacterController>()?.Move(Vec3.Zero);
+        }
+    }
+
     public void KillIdentity(int identityId)
     {
         if(!_agents.TryGetValue(identityId,out var r))return;

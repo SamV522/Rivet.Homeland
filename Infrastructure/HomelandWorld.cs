@@ -11,6 +11,10 @@ internal sealed class HomelandWorld : IDisposable
     private readonly Dictionary<int, Entity> _remotePlayers = [];
     private readonly Dictionary<int, Entity> _remoteCorpses = [];
     private readonly List<BuildingSpec> _buildings = [];
+    private readonly List<(Vec3 Center, Vec3 Half)> _roads = [];
+    public IReadOnlyList<(Vec3 Center, Vec3 Half)> Roads => _roads;
+    public IEnumerable<(Vec3 Center, Vec3 Half)> BuildingFootprints =>
+        _buildings.Select(b => (b.Center, b.Half));
     private Entity? _scheduleMarker;
     private int _scheduleMarkerId;
     private bool _built;
@@ -62,21 +66,21 @@ internal sealed class HomelandWorld : IDisposable
         for (var i = 0; i < 12; i++)
         {
             var name=$"Village house {i}";
-            AddBuilding(name,new Vec3(-69+(i%4)*11,0,-23+(i/4)*17),
+            AddBuilding(name,new Vec3(-69+(i%4)*11,0,new[] {-24f,-10f,10f}[i/4]),
                 HomelandAssets.House(name),new Vec3(.67f,.58f,.44f));
         }
 
         for (var i = 0; i < 18; i++)
         {
             var name=$"Bazaar shop {i}";
-            AddBuilding(name,new Vec3(-15+(i%6)*6,0,-18+(i/6)*16),
+            AddBuilding(name,new Vec3(-15+(i%6)*6,0,new[] {-20f,-9f,10f}[i/6]),
                 HomelandAssets.BazaarBuilding(name),new Vec3(.73f,.59f,.39f));
         }
 
         for (var i = 0; i < 10; i++)
         {
             var name=$"CBD block {i}";
-            AddBuilding(name,new Vec3(27+(i%5)*9,0,-18+(i/5)*30),
+            AddBuilding(name,new Vec3(27+(i%5)*9,0,-18+(i/5)*28),
                 HomelandAssets.CbdBuilding(name),new Vec3(.54f,.55f,.53f));
         }
 
@@ -97,6 +101,11 @@ internal sealed class HomelandWorld : IDisposable
     {
         var half=placement.ColliderHalfExtents;
         var center=new Vec3(groundPosition.X,half.Y,groundPosition.Z);
+        // Keep the complete model/collider footprint clear of every street.
+        foreach(var road in _roads)
+            if(MathF.Abs(center.X-road.Center.X)<half.X+road.Half.X+.4f &&
+               MathF.Abs(center.Z-road.Center.Z)<half.Z+road.Half.Z+.4f)
+                throw new InvalidOperationException($"{name} overlaps a road or its setback.");
         _buildings.Add(new BuildingSpec(name,center,half,tint,"building"));
 
         var root=_world.Spawn(name)
@@ -133,6 +142,7 @@ internal sealed class HomelandWorld : IDisposable
 
     private void AddRoad(Vec3 p,Vec3 half)
     {
+        _roads.Add((p,half));
         var e=_world.Spawn("Road base").SetTransform(new Transform(p,Vec3.Zero,One()))
             .SetBounds(half,Vec3.Zero).SetTint(new Vec3(.18f,.18f,.17f)).AddTag("DebugVisible");
         _entities.Add(e);
@@ -143,13 +153,16 @@ internal sealed class HomelandWorld : IDisposable
         var alongX=half.X>=half.Z;
         var halfLength=alongX?half.X:half.Z;
         const float spacing=4f;
-        var count=Math.Max(1,(int)MathF.Floor(halfLength*2/spacing));
+        var count=Math.Max(1,(int)MathF.Ceiling(halfLength*2/spacing));
+        var tileLength=halfLength*2/count;
+        var roadWidth=(alongX?half.Z:half.X)*2;
         for(var i=0;i<count;i++)
         {
-            var offset=-halfLength+spacing*.5f+i*spacing;
+            var offset=-halfLength+tileLength*.5f+i*tileLength;
             var position=p+(alongX?new Vec3(offset,.02f,0):new Vec3(0,.02f,offset));
             var visual=_world.Spawn("Kenney road tile")
-                .SetTransform(new Transform(position,new Vec3(0,alongX?90:0,0),new Vec3(4f,1f,4f)))
+                // Kenney's straight road runs along local X.
+                .SetTransform(new Transform(position,new Vec3(0,alongX?0:90,0),new Vec3(tileLength,1f,roadWidth)))
                 .SetModel(model);
             _entities.Add(visual);
         }
@@ -198,11 +211,12 @@ internal sealed class HomelandWorld : IDisposable
 
     private IReadOnlyList<NavigationModifier> NavigationModifiers()
     {
-        var result = new List<NavigationModifier>
+        var result = _roads.Select(road => new NavigationModifier
         {
-            new() { Minimum = new(-78, -1, -3.2f), Maximum = new(78, 1, 3.2f), Area = 2 },
-            new() { Minimum = new(-78, -1, 15.7f), Maximum = new(78, 1, 20.3f), Area = 2 }
-        };
+            Minimum = road.Center-new Vec3(road.Half.X,1,road.Half.Z),
+            Maximum = road.Center+new Vec3(road.Half.X,1,road.Half.Z),
+            Area = 2
+        }).ToList();
         // Exclusions come last so no lower-cost road modifier can reopen a building footprint.
         foreach (var b in _buildings)
             result.Add(new NavigationModifier

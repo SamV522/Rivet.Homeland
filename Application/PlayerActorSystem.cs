@@ -106,6 +106,8 @@ internal sealed class PlayerActorSystem : IDisposable
         }
         else if(player.State==LifeState.Active&&runtime.LastState==LifeState.Dead)
         {
+            if(_simulation.Practice)
+                runtime.Entity.SetTransform(runtime.Entity.Transform with{Position=SpawnPosition(player)});
             runtime.Entity.SetVisible(true);
         }
     }
@@ -160,6 +162,7 @@ internal sealed class PlayerActorSystem : IDisposable
 
     private Vec3 SpawnPosition(PlayerLife player)
     {
+        if(_simulation.Practice)return new Vec3(player.PeerId is null?-6:6,.05f,0);
         if(player.Faction==Faction.Cisf)
         {
             var spawn=_simulation.ResolveCisfSpawn(player)??player.PreferredCisfSpawn;
@@ -354,6 +357,12 @@ internal sealed class PlayerActorSystem : IDisposable
     public PlayerCombatTarget[] CombatTargets()=>_actors.Values.Select(r=>new PlayerCombatTarget(r.Player,r.Entity,r.Entity.Transform.Position)).ToArray();
 
     public Vec3 Position(int slot)=>_actors.TryGetValue(slot,out var r)?r.Entity.Transform.Position:Vec3.Zero;
+
+    public void StopMovement()
+    {
+        foreach(var actor in _actors.Values)
+            actor.Entity.GetComponent<CharacterController>()?.Move(Vec3.Zero);
+    }
     public Vec3 Aim(int slot)=>_actors.TryGetValue(slot,out var r)?r.Aim:new Vec3(0,0,1);
 
     public PlayerRuntimeSummary[] Capture()=>_actors.Values.Select(r=>

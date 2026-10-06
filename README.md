@@ -30,6 +30,7 @@ Homeland is an asymmetric top-down insurgency / counter-insurgency game built on
 ## Controls
 
 - WASD — move
+- M — toggle world map (Esc also closes it); movement and combat inputs are held while viewing the map
 - Mouse — aim
 - Left mouse — fire
 - E — interact / search / stabilize / resolve nearby strategic interaction or Schedule
@@ -43,6 +44,14 @@ Homeland is an asymmetric top-down insurgency / counter-insurgency game built on
 - B — HLA: order local armed Rebels to attack CISF
 - G — HLA: scramble local Rebels back into civilian life
 - K — abandon a detained player life where allowed
+
+## Practice
+
+Choose **Practice** in the main menu, then **Practice as CISF** or **Practice as HLA**. This offline solo sandbox uses the full town and the regular movement, combat, civilian, recruitment, and strategic interaction systems. A stationary opposing actor starts east of you along the main road for shooting, downing, stabilization, cuffs, and release. Three bazaar civilians start as HLA supporters so you can also try Call to Arms and Rebel orders.
+
+Practice has no victory condition or timeout and unlimited respawns, even if reinforcement tickets or spawn sites would normally be unavailable. F1 starts a fresh CISF session, F2 starts a fresh HLA session, and F5 resets your current side. F3 or Esc opens a paused practice menu with the same actions and **Back to main menu**. Resetting restores civilians, targets, corpses, intelligence, schedules, and strategic sites. M opens the map.
+
+Direct launch: `dotnet run -c Release -- --practice cisf` or `dotnet run -c Release -- --practice hla`.
 
 ## Checkout
 

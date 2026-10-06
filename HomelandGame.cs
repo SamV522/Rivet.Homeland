@@ -23,9 +23,16 @@ internal sealed class HomelandGame:IGameLoop,IDisposable
     private bool _started;
     private float _syncRemaining;
     private bool _disposed;
+    private bool _mapOpen;
+    private bool _practiceMenuOpen;
+    private Faction _practiceFaction;
+    private readonly Action? _returnToMenu;
+    private bool Practice=>_options.PracticeFaction is not null;
 
-    public HomelandGame(Engine engine,World world,HomelandLaunchOptions options,HomelandSettings settings)
+    public HomelandGame(Engine engine,World world,HomelandLaunchOptions options,HomelandSettings settings,Action? returnToMenu=null)
     {
+        _returnToMenu=returnToMenu;
+        _practiceFaction=options.PracticeFaction??Faction.Cisf;
         _engine=engine;_world=world;_options=options;
         _network=new(options);
         _scene=new(world);
@@ -46,20 +53,36 @@ internal sealed class HomelandGame:IGameLoop,IDisposable
             _engine.SetCameraPosition(new Vec3(0,65,42));
             _engine.SetCameraRotation(0,-62);
         }
+        if(Practice)StartMatch();
     }
 
     private void StartMatch()
     {
         if(!_options.IsHost||_started)return;
-        _sim=new HomelandSimulation(_settings);
+        _sim=new HomelandSimulation(_settings,Practice);
         _civilianAgents=new CivilianAgentSystem(_world,_scene,_sim);
         _civilianAgents.SpawnAll();
-        _sim.StartRoster(_network.PeerIds,_options.Dedicated);
+        if(Practice)_sim.StartPractice(_practiceFaction);
+        else _sim.StartRoster(_network.PeerIds,_options.Dedicated);
         _playerActors=new PlayerActorSystem(_world,_scene,_sim,_civilianAgents);
         _playerActors.SpawnAll();
         _started=true;
         if(!_options.Dedicated)_engine.SetMouseMode(MouseMode.Free);
         Broadcast(true);
+    }
+
+    private void ResetPractice(Faction faction)
+    {
+        if(!Practice)return;
+        _playerActors?.Dispose();
+        _civilianAgents?.Dispose();
+        _peerInputs.Clear();
+        _scene.UpdateScheduleMarker(null);
+        _started=false;
+        _mapOpen=false;
+        _practiceMenuOpen=false;
+        _practiceFaction=faction;
+        StartMatch();
     }
 
     public void FixedUpdate(float dt)
@@ -73,6 +96,7 @@ internal sealed class HomelandGame:IGameLoop,IDisposable
 
             if(_started)
             {
+                if(_practiceMenuOpen)return;
                 var hostInput=_options.Dedicated?IdleInput():ReadInput();
                 _playerActors!.FixedUpdate(dt,hostInput,_peerInputs);
                 _civilianAgents!.FixedUpdate(dt,_playerActors.IdentityPositions());
@@ -100,8 +124,21 @@ internal sealed class HomelandGame:IGameLoop,IDisposable
     public void Update(float dt)
     {
         if(_options.Dedicated)return;
+        if(Practice&&!_engine.Ui.WantsTextInput)
+        {
+            if(_engine.Input.Pressed(Key.F1))ResetPractice(Faction.Cisf);
+            else if(_engine.Input.Pressed(Key.F2))ResetPractice(Faction.Hla);
+            else if(_engine.Input.Pressed(Key.F5))ResetPractice(_practiceFaction);
+            else if(_engine.Input.Pressed(Key.F3))SetPracticeMenu(!_practiceMenuOpen);
+        }
+        if(_started && !_practiceMenuOpen && !_engine.Ui.WantsTextInput && _engine.Input.Pressed(Key.M))
+            _mapOpen=!_mapOpen;
         if(_engine.Input.Pressed(Key.Escape))
-            _engine.SetMouseMode(_engine.MouseMode==MouseMode.Free?MouseMode.Captured:MouseMode.Free);
+        {
+            if(_mapOpen) { _mapOpen=false; return; }
+            if(Practice)SetPracticeMenu(!_practiceMenuOpen);
+            else _engine.SetMouseMode(_engine.MouseMode==MouseMode.Free?MouseMode.Captured:MouseMode.Free);
+        }
 
         FollowLocalPlayer();
     }
@@ -121,12 +158,21 @@ internal sealed class HomelandGame:IGameLoop,IDisposable
 
         var sync=_network.IsHost?Sync():_network.Remote;
         var local=LocalSummary(sync);
-        _hud?.Draw(sync,local);
+        _hud?.Draw(sync,local,Practice);
+        if(Practice)
+        {
+            _engine.Render2D.Text("F1 CISF / F2 HLA / F5 reset / F3 or Esc practice menu",18,172,14,HomelandTheme.Text);
+            var target=sync.Players.FirstOrDefault(p=>p.PeerId==uint.MaxValue);
+            if(target is not null)
+                _engine.Render2D.Text($"Stationary {target.Faction.ToUpperInvariant()} target / {target.State} / starts east along the main road",18,194,13,HomelandTheme.Accent);
+            if(_practiceMenuOpen)DrawPracticeMenu();
+        }
+        if(_mapOpen)_hud?.DrawMap(sync,local,_scene);
     }
 
     private HomelandInput ReadInput()
     {
-        if(_engine.Ui.WantsTextInput)return IdleInput();
+        if(_mapOpen||_practiceMenuOpen||_engine.Ui.WantsTextInput)return IdleInput();
         var x=(_engine.Input.Down(Key.D)?1f:0)-(_engine.Input.Down(Key.A)?1f:0);
         var z=(_engine.Input.Down(Key.S)?1f:0)-(_engine.Input.Down(Key.W)?1f:0);
         var move=new Vec3(x,0,z);if(move.LengthSquared>1)move=move.Normalized;
@@ -154,6 +200,29 @@ internal sealed class HomelandGame:IGameLoop,IDisposable
     }
 
     private static HomelandInput IdleInput()=>new(0,0,0,1,HomelandButtons.None);
+
+    private void SetPracticeMenu(bool open)
+    {
+        _practiceMenuOpen=open;
+        if(open)_mapOpen=false;
+        _playerActors?.StopMovement();
+        _civilianAgents?.SetPaused(open);
+    }
+
+    private void DrawPracticeMenu()
+    {
+        var v=_engine.Input.ViewportSize;
+        var x=(v.X-620)/2;
+        var y=(v.Y-430)/2;
+        _engine.Render2D.Rectangle(0,0,v.X,v.Y,new Color4(0,0,0,.9f));
+        _engine.Render2D.Text("PRACTICE / PAUSED",x,y,26,HomelandTheme.Text);
+        _engine.Render2D.TextBox("Explore either faction. No match timeout or victory; unlimited respawns. Switching sides or resetting restores civilians, targets, and strategic sites.",x,y+44,620,66,16,HomelandTheme.Muted);
+        if(MenuWidgets.Button(_engine,new(x,y+124,298,48),"PLAY CISF / F1",primary:_practiceFaction==Faction.Cisf))ResetPractice(Faction.Cisf);
+        if(MenuWidgets.Button(_engine,new(x+322,y+124,298,48),"PLAY HLA / F2",primary:_practiceFaction==Faction.Hla))ResetPractice(Faction.Hla);
+        if(MenuWidgets.Button(_engine,new(x,y+190,620,48),"RESET PRACTICE / F5"))ResetPractice(_practiceFaction);
+        if(MenuWidgets.Button(_engine,new(x,y+256,620,48),"RESUME / ESC"))SetPracticeMenu(false);
+        if(MenuWidgets.Button(_engine,new(x,y+322,620,48),"BACK TO MAIN MENU",_returnToMenu is not null))_returnToMenu?.Invoke();
+    }
 
     private void Broadcast(bool immediate=false)
     {

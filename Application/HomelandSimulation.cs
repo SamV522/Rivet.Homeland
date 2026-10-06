@@ -20,15 +20,33 @@ internal sealed class HomelandSimulation
     public bool InsurrectionActive { get; private set; }
     public string Objective { get; private set; }="Maintain order / build intelligence";
     public string? Winner { get; private set; }
+    public bool Practice { get; }
 
     private readonly IdentityGenerator _ids=new(78421);
     private int _nextCisf=10000;
 
-    public HomelandSimulation(HomelandSettings settings)
+    public HomelandSimulation(HomelandSettings settings,bool practice=false)
     {
+        Practice=practice;
         Settings=settings;
         MatchRemaining=settings.MatchMinutes*60;
         Civilians.Seed(settings.CivilianPopulation,_ids);
+    }
+
+    public void StartPractice(Faction faction)
+    {
+        if(!Practice||faction==Faction.Civilian||Players.Count>0)
+            throw new InvalidOperationException("Practice requires a fresh simulation and CISF or HLA.");
+        Players.Add(faction==Faction.Cisf?NewCisf(1,null):NewHla(1,null));
+        // Reserved local actor: uses idle input and the regular combat/interaction rules.
+        Players.Add(faction==Faction.Cisf?NewHla(2,uint.MaxValue):NewCisf(2,uint.MaxValue));
+        foreach(var civilian in Civilians.Civilians.Where(c=>c.District==District.Bazaar&&!c.PlayerControlled).Take(3))
+        {
+            civilian.Rebel=true;
+            civilian.AvailableAsHlaTicket=true;
+            civilian.HlaAlignment=.9f;
+        }
+        Objective="Practice / explore the town and test your faction's tools";
     }
 
     public void StartRoster(IReadOnlyList<uint> peerIds,bool dedicated=false)
@@ -102,8 +120,11 @@ internal sealed class HomelandSimulation
                 Civilians.CallToArms(d,0,0,0,1.3f);
         }
 
-        MatchRemaining=Math.Max(0,MatchRemaining-dt);
-        CheckVictory();
+        if(!Practice)
+        {
+            MatchRemaining=Math.Max(0,MatchRemaining-dt);
+            CheckVictory();
+        }
     }
 
     public PlayerLife? PlayerForPeer(uint peer)=>Players.FirstOrDefault(p=>p.PeerId==peer);
@@ -150,7 +171,8 @@ internal sealed class HomelandSimulation
     {
         if(p.State==LifeState.Dead)return;
         p.State=LifeState.Dead;
-        p.RespawnRemaining=HomelandRules.RespawnDelaySeconds;
+        p.RespawnRemaining=Practice?3:HomelandRules.RespawnDelaySeconds;
+        if(Practice)return;
         if(p.Faction==Faction.Cisf)
         {
             CisfTickets=Math.Max(0,CisfTickets-1);
@@ -205,6 +227,7 @@ internal sealed class HomelandSimulation
     public void AbandonDetainedLife(PlayerLife p)
     {
         if(p.State!=LifeState.Detained)return;
+        if(Practice) { Respawn(p); return; }
 
         if(p.Faction==Faction.Cisf)
         {
@@ -229,6 +252,24 @@ internal sealed class HomelandSimulation
 
     private void Respawn(PlayerLife p)
     {
+        if(Practice)
+        {
+            p.State=LifeState.Active;
+            p.Health=100;
+            p.Restrained=false;
+            p.InVehiclePrisonerSeat=false;
+            p.BleedOutRemaining=0;
+            p.RespawnRemaining=0;
+            p.EquipmentSummary=p.Faction==Faction.Cisf
+                ?"CISF rifle, sidearm, armour, cuffs, radio":"Civilian clothes, concealed pistol";
+            if(Civilians.ById(p.Identity.Id) is { } civilian)
+            {
+                civilian.Health=100;
+                civilian.Incarcerated=false;
+                civilian.PlayerControlled=true;
+            }
+            return;
+        }
         if(p.Faction==Faction.Cisf)
         {
             if(CisfTickets<=0||!AnyCisfSpawnAvailable)return;

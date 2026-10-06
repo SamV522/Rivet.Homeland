@@ -62,7 +62,7 @@ internal sealed class HomelandApplication(HomelandLaunchOptions defaults):IGameL
         if(options is null)
         {
             _invites?.ClearSession();
-            _screen=new MainMenu(_engine!,defaults,_settings,EnsureSteam,Select);
+            _screen=new MainMenu(_engine!,defaults with{PracticeFaction=null},_settings,EnsureSteam,Select);
         }
         else
         {
@@ -73,7 +73,7 @@ internal sealed class HomelandApplication(HomelandLaunchOptions defaults):IGameL
             }
             else _invites?.ClearSession();
 
-            _screen=new HomelandGame(_engine!,_world!,options,_settings);
+            _screen=new HomelandGame(_engine!,_world!,options,_settings,()=>{_next=null;_transition=true;});
         }
         _screen.Start();
     }

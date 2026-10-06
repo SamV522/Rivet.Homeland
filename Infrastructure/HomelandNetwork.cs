@@ -10,16 +10,19 @@ internal sealed class HomelandNetwork:IDisposable
     private readonly NetworkClientSession? _client;
     private readonly NetworkServerEvents? _serverEvents;
     private readonly NetworkClientEvents? _clientEvents;
+    private readonly bool _offline;
 
     public HomelandSync Remote {get;private set;}=HomelandSync.Empty;
     public HomelandNetwork(HomelandLaunchOptions o)
     {
+        _offline=o.PracticeFaction is not null;
+        if(_offline)return;
         var t=HomelandTransport.Create(o);
         if(o.IsHost){_server=NetworkServerSession.Listen(t);_serverEvents=new(_server);}
         else{_client=NetworkClientSession.Connect(t,HomelandTransport.HostAddress(o));_clientEvents=new(_client);}
     }
 
-    public bool IsHost=>_server is not null;
+    public bool IsHost=>_offline||_server is not null;
     public bool IsConnected=>_client?.IsConnected??true;
     public int PeerCount=>_server?.Connections.Count(c=>c.IsConnected)??0;
     public IReadOnlyList<uint> PeerIds=>_server?.Connections.Where(c=>c.IsConnected).Select(c=>c.Id).ToArray()??[];
